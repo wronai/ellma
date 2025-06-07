@@ -4,7 +4,7 @@ ELLMa - Evolutionary Local LLM Agent
 A self-evolving AI assistant that improves itself through usage and experience.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.6"
 __author__ = "ELLMa Team"
 __email__ = "contact@ellma.dev"
 __license__ = "MIT"
@@ -55,6 +55,7 @@ __all__ = [
     'EvolutionError',
     'CommandError',
     '__version__',
+    'BANNER',
 ]
 
 # Package metadata for introspection
@@ -80,10 +81,5 @@ def get_package_info():
     return PACKAGE_INFO.copy()
 
 
-# Banner for CLI
-BANNER = f"""
-🧬 ELLMa v{__version__} - Evolutionary Local LLM Agent
-   Self-improving AI assistant that grows with your needs
-
-   Type 'help' for commands, 'evolve' to improve capabilities
-"""
+# Import BANNER from constants module
+from ellma.constants import BANNER

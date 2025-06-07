@@ -72,6 +72,7 @@ clean: ## Clean build artifacts
 	find . -path './.venv' -prune -o -type f -name '*.pyo' -exec rm -f {} +
 
 build: ## Build the package
+	poetry version patch
 	poetry build
 
 publish-test: build ## Publish to test PyPI

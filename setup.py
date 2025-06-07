@@ -18,7 +18,7 @@ def read_requirements():
 
 setup(
     name="ellma",
-    version="0.1.0",
+    version="0.1.6",
     description="Evolutionary Local LLM Agent - Self-improving AI assistant",
     long_description=read_file('README.md'),
     long_description_content_type="text/markdown",

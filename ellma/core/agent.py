@@ -450,7 +450,7 @@ class ELLMa:
     def get_status(self) -> Dict:
         """Get agent status information"""
         return {
-            'version': '0.1.0',
+            'version': '0.1.6',
             'model_loaded': self.llm is not None,
             'model_path': self.model_path,
             'modules_count': len(self.modules),

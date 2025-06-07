@@ -18,10 +18,18 @@ ELLMa is a revolutionary **self-evolving AI agent** that runs locally on your ma
 - 📦 **Modular**: Extensible architecture that grows with your needs
 
 ## ⚡ Quick Start
+install
+```bash
+bash ./scripts/install.sh
+```
 
 ### Installation
 ```bash
-pip install ellma
+pip install ellma --upgrade
+```
+local
+```bash
+pip install -e .
 ```
 
 ### First Steps
@@ -37,7 +45,7 @@ ellma shell
 
 # Or execute commands directly
 ellma exec "system.scan"
-ellma exec "web.read https://example.com"
+ellma exec "web.read https://softrec.com"
 ```
 
 ### Your First Evolution
@@ -219,7 +227,7 @@ ellma web --port 8000
 
 ## 🛣️ Roadmap
 
-### Version 0.1.0 - MVP ✅
+### Version 0.1.6 - MVP ✅
 - [x] Core agent with Mistral 7B
 - [x] Basic command system
 - [x] Shell interface

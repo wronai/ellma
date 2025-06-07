@@ -25,7 +25,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.markdown import Markdown
 
-from ellma import BANNER
+from ellma.constants import BANNER
 from ellma.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -121,7 +121,7 @@ class InteractiveShell:
     def run(self):
         """Start the interactive shell"""
         self.console.print(BANNER)
-        self._show_agent_status()
+        self._cmd_status([])  # Show initial status
 
         while self.running:
             try:
