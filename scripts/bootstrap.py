@@ -511,7 +511,14 @@ def main():
             # Use default configuration
             from ellma.utils.config import ConfigManager
             manager = ConfigManager()
-            config = manager.get_config()
+            config = {}
+            # Get all known configuration keys
+            for key in ['model', 'agent', 'directories']:
+                config[key] = {}
+                for subkey in ['path', 'context_length', 'n_threads', 'auto_evolve', 'verbose', 'home', 'models', 'modules', 'logs']:
+                    value = manager.get(f"{key}.{subkey}")
+                    if value is not None:
+                        config[key][subkey] = value
 
         # Save configuration
         bootstrap.save_config(config)

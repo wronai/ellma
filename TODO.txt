@@ -1,0 +1,5 @@
+aby ellma dziaa poprawnie przy realziacji zada musi weryfikowa swoj scieke decyzyjnych
+stworz ewolucyjny system poprawy promptow i rezultatow poprzez monitorowanie prmptu i skutku jakie wywoluje, oraz poprze wczesniejsze okreslenie celu do jakiego ma doprowadzuic w przypadku
+gdy to nie zostalo wykonane porpawnie, trzbea to naprawic i tutaj tez jest potrzebne rozwidlenie jak funkcjonowac za pierwszym razem gdyu  kod jeszcze nie ozstal napsiany i jak po jego naprazwieniu, albo gdy otrzeymujemy srodowisko, ktore trzeba poprawic, np jakas konfiugracja w sytsemia nie duizal poprawnie,
+Tutaj jets potrzebne ropodobne rozwiaqanie jak w pliku ../inceptor z wielowartswowa kontrola oraz jak ../shellGuard do testowania rezukltatwo i przywracanie
+gdy zostanie utracony ssystem, kod, oraz taskguard, w celu kontroli realizowaneego celu, aby poprzez ewnetualne problemy lub halucynajcje opkmodelu nie trobic zdan, ktore nie ozstaly wczesniej zadane

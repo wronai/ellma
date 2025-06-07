@@ -22,6 +22,21 @@ def mock_agent():
     agent.commands["module1"].action1 = MagicMock()
     agent.commands["module1"].action2 = MagicMock()
     agent.commands["module2"].do_something = MagicMock()
+    
+    # Mock the get_status method to return a proper status dictionary
+    agent.get_status.return_value = {
+        'version': '0.1.6',
+        'model_loaded': True,
+        'model_path': '/path/to/model',
+        'modules_count': 2,
+        'commands_count': 3,
+        'performance_metrics': {
+            'commands_executed': 10,
+            'successful_executions': 9,
+            'evolution_cycles': 1
+        }
+    }
+    
     return agent
 
 
@@ -75,23 +90,29 @@ def test_interactive_shell_initialization(mock_agent, tmp_path):
     assert str(shell.history_file) == str(tmp_path / "shell_history.txt")
 
 
-@patch('ellma.core.shell.Console')
-def test_shell_help_command(mock_console, mock_agent):
+def test_shell_help_command(mock_agent):
     """Test the help command functionality."""
     shell = InteractiveShell(mock_agent)
     
-    # Mock the input to simulate user typing 'help' and then 'exit'
-    with patch('builtins.input', side_effect=["help", "exit"]):
-        with patch.object(shell, '_cmd_help') as mock_help:
-            shell.run()
-            mock_help.assert_called_once()
+    # Test the help command directly
+    with patch.object(shell.console, 'print') as mock_print:
+        result = shell._cmd_help([])
+        assert result == "Help displayed"
+        mock_print.assert_called()
+        
+    # Test help for a specific command
+    with patch.object(shell.console, 'print') as mock_print:
+        result = shell._cmd_help(["status"])
+        assert "status" in result
+        assert "Show agent status" in result
 
 
 def test_shell_exit_command(mock_agent):
     """Test that the exit command stops the shell."""
     shell = InteractiveShell(mock_agent)
     
-    # Mock the input to simulate user typing 'exit'
-    with patch('builtins.input', return_value="exit"):
-        shell.run()
-        assert shell.running is False
+    # Test that _cmd_exit sets running to False
+    assert shell.running is True
+    result = shell._cmd_exit([])
+    assert result == "Goodbye!"
+    assert shell.running is False

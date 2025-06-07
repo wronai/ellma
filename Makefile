@@ -12,14 +12,14 @@ help: ## Show this help message
 
 # Installation targets
 install: ## Install the package
-	poetry install
+	poetry install --no-root
 
-dev-install: ## Install with development dependencies
-	poetry install --with dev
+install-dev: ## Install with development dependencies
+	poetry install --with dev --extras "docs"
 	poetry run pre-commit install
 
 install-all: ## Install with all optional dependencies
-	poetry install --with dev --extras "web audio full"
+	poetry install --with dev,web,audio,full,docs
 
 # Testing targets
 test: ## Run all tests
@@ -176,7 +176,7 @@ tag: ## Create git tag with current version
 	git push origin v$(shell poetry version -s)
 
 # Development workflow shortcuts
-dev: dev-install format lint test ## Full development setup and check
+dev: install-dev format lint test ## Full development setup and check
 
 quick-test: ## Quick test run (unit tests only)
 	poetry run pytest tests/ -x -v --tb=short

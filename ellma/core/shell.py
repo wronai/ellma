@@ -163,6 +163,18 @@ class InteractiveShell:
 
         self._on_exit()
 
+    def _on_exit(self):
+        """Cleanup tasks when shell exits"""
+        # Save history if needed
+        if hasattr(self, 'history') and hasattr(self.history, 'save'):
+            try:
+                self.history.save()
+            except Exception as e:
+                self.console.print(f"[yellow]Warning: Failed to save history: {e}[/yellow]")
+        
+        # Any other cleanup tasks can be added here
+        self.console.print("\n[green]Goodbye![/green]")
+
     def _process_command(self, user_input: str):
         """Process user command"""
         try:

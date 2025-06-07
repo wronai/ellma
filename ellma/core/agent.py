@@ -61,35 +61,86 @@ class ELLMa:
             auto_evolve: Enable automatic evolution
             verbose: Enable verbose logging
         """
-        # Initialize console for rich output
+        # Initialize basic attributes first
         self.console = Console()
-
-        # Initialize components
-        self.config_manager = ConfigManager(config_path)
-        self.config = self.config_manager.get_config()
-        self.module_registry = ModuleRegistry()
-
-        # Agent state
-        self.model_path = model_path or self._find_model()
-        self.llm = None
-        self.commands = {}
-        self.modules = {}
-        self.task_history = []
-        self.performance_metrics = {}
         self.auto_evolve = auto_evolve
         self.verbose = verbose
-
-        # Directories
+        
+        # Initialize paths and directories
         self.home_dir = Path.home() / ".ellma"
         self.models_dir = self.home_dir / "models"
         self.modules_dir = self.home_dir / "modules"
         self.logs_dir = self.home_dir / "logs"
-
-        # Create directories
+        
+        # Ensure directories exist
         self._setup_directories()
-
-        # Initialize agent
+        
+        # Initialize configuration
+        self.config_manager = ConfigManager(config_path)
+        self.config = {}
+        
+        # Set model path (either from parameter or auto-detect)
+        self.model_path = None
+        if model_path and Path(model_path).exists():
+            self.model_path = Path(model_path)
+        
+        # Now load the config which depends on model_path
+        self._load_config()
+        
+        # If model_path wasn't provided or doesn't exist, try to find it
+        if self.model_path is None or not self.model_path.exists():
+            found_path = self._find_model()
+            if found_path:
+                self.model_path = Path(found_path)
+        
+        # Initialize other components
+        self.module_registry = ModuleRegistry()
+        self.llm = None
+        self.commands = {}
+        self.modules = {}
+        self.task_history = []
+        self.performance_metrics = {
+            'commands_executed': 0,
+            'successful_executions': 0,
+            'total_execution_time': 0.0,
+            'average_execution_time': 0.0,
+            'evolution_cycles': 0
+        }
+        
+        # Initialize the agent
         self._initialize()
+
+    def _load_config(self):
+        """Load configuration from config manager"""
+        default_config = {
+            'model': {
+                'path': str(self.model_path) if self.model_path else None,
+                'context_length': 2048,
+                'n_threads': max(1, os.cpu_count() // 2)
+            },
+            'agent': {
+                'auto_evolve': self.auto_evolve,
+                'verbose': self.verbose
+            },
+            'directories': {
+                'home': str(self.home_dir),
+                'models': str(self.models_dir),
+                'modules': str(self.modules_dir),
+                'logs': str(self.logs_dir)
+            }
+        }
+        
+        # Update with any existing config values
+        for key in default_config:
+            if isinstance(default_config[key], dict):
+                for subkey in default_config[key]:
+                    full_key = f"{key}.{subkey}"
+                    value = self.config_manager.get(full_key, default_config[key][subkey])
+                    if key not in self.config:
+                        self.config[key] = {}
+                    self.config[key][subkey] = value
+            else:
+                self.config[key] = self.config_manager.get(key, default_config[key])
 
     def _setup_directories(self):
         """Create necessary directories"""
@@ -145,7 +196,7 @@ class ELLMa:
 
     def _load_model(self):
         """Load the LLM model"""
-        if not self.model_path or not Path(self.model_path).exists():
+        if not self.model_path or not self.model_path.exists():
             raise ModelNotFoundError(f"Model not found: {self.model_path}")
 
         try:
@@ -158,7 +209,7 @@ class ELLMa:
 
                 model_config = self.config.get("model", {})
                 self.llm = Llama(
-                    model_path=self.model_path,
+                    model_path=str(self.model_path),  # Convert Path to string for Llama
                     n_ctx=model_config.get("context_length", 4096),
                     n_threads=model_config.get("threads", os.cpu_count()),
                     verbose=self.verbose
@@ -166,7 +217,7 @@ class ELLMa:
 
                 progress.update(task, description="Model loaded successfully!")
 
-            self.console.print(f"[green]✅ Model loaded: {Path(self.model_path).name}[/green]")
+            self.console.print(f"[green]✅ Model loaded: {self.model_path.name}[/green]")
             logger.info(f"LLM model loaded: {self.model_path}")
 
         except Exception as e:
