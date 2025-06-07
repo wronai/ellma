@@ -184,15 +184,24 @@ class InteractiveShell:
     def _process_command(self, user_input: str):
         """Process user command with simplified syntax
         
-        Supports both simple commands and structured commands with parameters:
-        - Simple: command
-        - With params: command param1 value1 param2 value2
-        - Module actions: module.action param1 value1
+        Supports multiple command formats:
+        - Simple commands: help, status
+        - Module actions: sys.config, web.get
+        - Commands with flags: command --flag value
+        - Natural language when LLM is available
         """
         try:
             # Skip empty input
             if not user_input.strip():
                 return
+
+            # Log the command
+            self.session_history.append({
+                'timestamp': datetime.now().isoformat(),
+                'command': user_input,
+                'type': 'user_input'
+            })
+
 
             # Split command and arguments
             parts = user_input.split()
@@ -201,46 +210,98 @@ class InteractiveShell:
             # Check for built-in commands first (no dot)
             if command in self.builtin_commands and '.' not in command:
                 result = self.builtin_commands[command](parts[1:])
+                self._display_result(result)
                 self._log_result(user_input, result, True)
                 return
 
-            # Parse command and parameters
-            params = {}
-            i = 1
-            while i < len(parts):
-                # If next part starts with '--', it's a flag
-                if parts[i].startswith('--'):
-                    param = parts[i][2:]
-                    # Check if next part is a value (not another param)
-                    if i + 1 < len(parts) and not parts[i + 1].startswith('--'):
-                        params[param] = parts[i + 1]
-                        i += 2
-                    else:
-                        # Boolean flag
-                        params[param] = True
-                        i += 1
-                else:
-                    # Positional argument (e.g., URL)
-                    if 'url' not in params and ('http://' in parts[i] or 'https://' in parts[i] or '.' in parts[i]):
-                        params['url'] = parts[i]
-                    i += 1
-
-            # Check for structured commands (module.action)
+            # Handle module.action format
             if '.' in command:
-                # Convert params to string representation for the agent
-                param_str = ' '.join([f"{k}={v}" for k, v in params.items()])
-                full_command = f"{command} {param_str}".strip()
-                result = self.agent.execute(full_command)
-                self._display_result(result)
-                self._log_result(user_input, result, True)
+                module_name, action = command.split('.', 1)
+                
+                # Check if module exists
+                if module_name not in self.agent.commands:
+                    self.console.print(f"[red]Unknown module: {module_name}[/red]")
+                    self.console.print("Available modules: " + ", ".join(self.agent.commands.keys()))
+                    return
+                
+                module = self.agent.commands[module_name]
+                
+                # Check if action exists in module
+                if not hasattr(module, action) or not callable(getattr(module, action)):
+                    self.console.print(f"[red]Unknown action '{action}' for module '{module_name}'[/red]")
+                    # Show available actions for this module
+                    actions = [a for a in dir(module) 
+                             if not a.startswith('_') and callable(getattr(module, a))]
+                    if actions:
+                        self.console.print(f"Available actions: {', '.join(actions)}")
+                    return
+                
+                # Parse parameters
+                params = {}
+                i = 1  # Skip the command itself
+                while i < len(parts):
+                    # Handle flags (--flag value or --flag)
+                    if parts[i].startswith('--'):
+                        param = parts[i][2:]
+                        # Check if next part is a value (not another flag)
+                        if i + 1 < len(parts) and not parts[i + 1].startswith('--'):
+                            params[param] = parts[i + 1]
+                            i += 2
+                        else:
+                            # Boolean flag
+                            params[param] = True
+                            i += 1
+                    else:
+                        # Positional argument
+                        if 'url' not in params and ('http://' in parts[i] or 'https://' in parts[i] or '.' in parts[i]):
+                            params['url'] = parts[i]
+                        i += 1
+                
+                try:
+                    # Call the module action with parameters
+                    result = getattr(module, action)(**params)
+                    self._display_result(result)
+                    self._log_result(user_input, result, True)
+                except Exception as e:
+                    self.console.print(f"[red]Error executing {command}: {e}[/red]")
+                    if self.agent.verbose:
+                        self.console.print(traceback.format_exc())
+                    self._log_result(user_input, str(e), False)
                 return
 
-            # Try as natural language command
-            if self.agent.llm:
+            # Check if this is a known command before falling back to NLP
+            all_commands = []
+            for mod_name, module in self.agent.commands.items():
+                actions = [f"{mod_name}.{a}" for a in dir(module) 
+                         if not a.startswith('_') and callable(getattr(module, a))]
+                all_commands.extend(actions)
+            
+            # Check if the command matches any known command (case insensitive)
+            cmd_lower = command.lower()
+            matching_commands = [c for c in all_commands if c.lower().startswith(cmd_lower)]
+            
+            if matching_commands:
+                if len(matching_commands) == 1:
+                    # If there's exactly one match, suggest it
+                    suggested_cmd = matching_commands[0]
+                    self.console.print(f"[yellow]Did you mean: {suggested_cmd}?[/yellow]")
+                else:
+                    # If multiple matches, show them all
+                    self.console.print("[yellow]Multiple matching commands found:[/yellow]")
+                    for cmd in matching_commands:
+                        self.console.print(f"  {cmd}")
+                return
+
+            # Only try natural language processing if explicitly enabled and LLM is available
+            if self.agent.config.get('shell', {}).get('use_nlp', True) and self.agent.llm:
                 self.console.print("[dim]Interpreting as natural language...[/dim]")
-                result = self.agent.execute(user_input)
-                self._display_result(result)
-                self._log_result(user_input, result, True)
+                try:
+                    result = self.agent.execute(user_input)
+                    self._display_result(result)
+                    self._log_result(user_input, result, True)
+                except Exception as e:
+                    self.console.print(f"[red]Error: {e}[/red]")
+                    self._log_result(user_input, str(e), False)
             else:
                 self.console.print(f"[red]Unknown command: {command}[/red]")
                 self.console.print("Type 'help' for available commands")
@@ -248,6 +309,8 @@ class InteractiveShell:
 
         except Exception as e:
             self.console.print(f"[red]Error: {e}[/red]")
+            if self.agent.verbose:
+                self.console.print(traceback.format_exc())
             self._log_result(user_input, str(e), False)
 
     def _display_result(self, result: Any):

@@ -9,6 +9,8 @@ from ellma.commands.base import BaseCommand, SimpleCommand, CommandError
 from ellma.commands.system import SystemCommands
 from ellma.commands.web import WebCommands
 from ellma.commands.files import FileCommands
+from ellma.commands.introspection import IntrospectionCommands
+from ellma.commands.audio import AudioCommands
 
 __all__ = [
     'BaseCommand',
@@ -16,14 +18,18 @@ __all__ = [
     'CommandError',
     'SystemCommands',
     'WebCommands',
-    'FileCommands'
+    'FileCommands',
+    'IntrospectionCommands',
+    'AudioCommands'
 ]
 
 # Command registry for built-in commands
 BUILTIN_COMMANDS = {
     'system': SystemCommands,
     'web': WebCommands,
-    'files': FileCommands
+    'files': FileCommands,
+    'sys': IntrospectionCommands,
+    'audio': AudioCommands
 }
 
 def get_builtin_commands():

@@ -1,7 +1,8 @@
 TODO.txt
 .idea
-venv
-.env
+venv*
+.venv*
+.env*
 # Logs
 logs
 *.log

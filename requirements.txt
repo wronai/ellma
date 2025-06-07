@@ -13,3 +13,7 @@ prompt-toolkit>=3.0.0           # Interactive CLI components
 aiofiles>=23.0.0                # Async file operations
 httpx>=0.24.0                   # Modern async HTTP client
 pathlib>=1.0.1                  # Path manipulation (backport for older Python)
+
+# Audio dependencies (optional)
+# Install with: pip install -r requirements-audio.txt
+# or: pip install 'ellma[audio]'

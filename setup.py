@@ -42,7 +42,13 @@ setup(
             'websockets>=11.0.0',
         ],
         'audio': [
-            'sounddevice>=0.4.0',
+            'pyttsx3>=2.90',
+            'SpeechRecognition>=3.10.0',
+            'pydub>=0.25.1',
+            'pyaudio>=0.2.13',
+            'whisper-openai>=20231117',
+            'gTTS>=2.3.2',
+            'sounddevice>=0.4.6',
             'scipy>=1.9.0',
             'librosa>=0.10.0',
         ]

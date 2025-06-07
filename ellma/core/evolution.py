@@ -60,14 +60,9 @@ class EvolutionEngine:
             agent: ELLMa agent instance
             config: Optional configuration overrides for evolution
         """
+        # Initialize basic attributes first
         self.agent = agent
         self.console = Console()
-        
-        # Set up evolution configuration and environment
-        self.config = EvolutionConfig(config)
-        self.evolution_env = setup_evolution_environment(config)
-        
-        # Initialize metrics and state
         self.evolution_log = []
         self.capabilities = set()
         self.improvement_suggestions = []
@@ -75,7 +70,14 @@ class EvolutionEngine:
         self.is_evolving = False
         self.current_cycle = None
         
-        # Metrics tracking
+        # Set up evolution configuration and environment
+        self.config = EvolutionConfig(config or {})
+        self.evolution_env = setup_evolution_environment(config or {})
+        
+        # Initialize configuration from agent config
+        self._load_configuration()
+        
+        # Initialize metrics tracking
         self.evolution_metrics = {
             'total_cycles': 0,
             'successful_cycles': 0,
@@ -93,20 +95,142 @@ class EvolutionEngine:
         )
         
         # Set up directories and load history
-        self._setup_directories()
-        self._load_evolution_history()
+        try:
+            self._setup_directories()
+            self._load_evolution_history()
+        except Exception as e:
+            logger.error(f"Failed to initialize evolution engine: {e}")
+            if self.console:
+                self.console.print(f"[red]Failed to initialize evolution engine: {e}[/red]")
+            raise
         
-        # Log initialization
-        self.console.print("[green]✓ Evolution Engine initialized[/green]")
+        # Log successful initialization
         logger.info("Evolution Engine initialized with config: %s", self.config.__dict__)
-        
-        # Initialize evolution state
-        self.current_cycle = None
-        self.is_evolving = False
+        if self.console:
+            self.console.print("[green]✓ Evolution Engine initialized[/green]")
 
+    def _setup_directories(self) -> None:
+        """Set up required directories for evolution.
+        
+        Creates the following directory structure:
+        - evolution/
+          - generated/    # For generated module code
+          - logs/        # For evolution logs
+          - history/     # For evolution history
+          - backups/     # For backup of previous versions
+        """
+        try:
+            # Base directory for evolution
+            base_dir = Path(".ellma/evolution")
+            self.evolution_dir = base_dir
+            
+            # Define directory structure
+            self.directories = {
+                'base': base_dir,
+                'generated': base_dir / 'generated',
+                'logs': base_dir / 'logs',
+                'history': base_dir / 'history',
+                'backups': base_dir / 'backups'
+            }
+            
+            # Create directories if they don't exist
+            for dir_path in self.directories.values():
+                dir_path.mkdir(parents=True, exist_ok=True)
+                
+            logger.info(f"Evolution directories set up at: {base_dir.absolute()}")
+            return True
+            
+        except Exception as e:
+            error_msg = f"Failed to set up evolution directories: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            if hasattr(self, 'console'):
+                self.console.print(f"[red]Error: {error_msg}[/red]")
+            raise RuntimeError(error_msg) from e
+
+    def _log_step(self, step_name: str, message: str, status: str = 'in_progress', **kwargs) -> None:
+        """Log a step in the evolution process.
+        
+        Args:
+            step_name: Name of the current step (e.g., 'analysis', 'integration')
+            message: Message to log
+            status: Status of the step ('in_progress', 'completed', 'failed')
+            **kwargs: Additional key-value pairs to include in the log entry
+        """
+        timestamp = datetime.now().isoformat()
+        log_entry = {
+            'timestamp': timestamp,
+            'step': step_name,
+            'message': message,
+            'status': status,
+            **kwargs
+        }
+        
+        if not hasattr(self, 'current_cycle') or self.current_cycle is None:
+            self.current_cycle = {}
+        
+        if 'steps' not in self.current_cycle:
+            self.current_cycle['steps'] = []
+            
+        self.current_cycle['steps'].append(log_entry)
+        
+        status_emoji = {
+            'in_progress': '🔄',
+            'completed': '✅',
+            'failed': '❌'
+        }.get(status, 'ℹ️')
+        
+        log_message = f"{status_emoji} [{step_name.upper()}] {message}"
+        if 'error' in kwargs:
+            log_message += f"\nError: {kwargs['error']}"
+            
+        logger.info(log_message)
+        self.console.print(f"[bold]{log_message}[/bold]")
+
+    def _load_evolution_history(self) -> None:
+        """Load evolution history from disk if it exists."""
+        history_file = self.directories['history'] / 'evolution_history.json'
+        if history_file.exists():
+            try:
+                with open(history_file, 'r') as f:
+                    self.evolution_history = json.load(f)
+                logger.info(f"Loaded evolution history from {history_file}")
+            except Exception as e:
+                logger.error(f"Failed to load evolution history: {e}")
+                self.evolution_history = {}
+        else:
+            self.evolution_history = {}
+            logger.info("No previous evolution history found, starting fresh")
+        
+        # Create directories if they don't exist
+        for dir_path in self.directories.values():
+            dir_path.mkdir(parents=True, exist_ok=True)
+            
+        logger.info(f"Evolution directories set up at: {base_dir.absolute()}")
+        
     def _load_configuration(self):
         """Load and validate evolution configuration"""
-        self.evolution_config = self.agent.config.get("evolution", {})
+        # Default configuration
+        default_config = {
+            'enabled': True,
+            'auto_evolve': True,
+            'max_evolution_attempts': 3,
+            'backup_before_evolution': True,
+            'max_modules_to_generate': 5,
+            'min_success_rate': 0.7,
+            'max_failure_rate': 0.2,
+            'resource_limits': {
+                'max_memory_mb': 4096,
+                'min_disk_space_gb': 5,
+                'max_cpu_percent': 80
+            }
+        }
+        
+        # Merge with agent config
+        self.config = {**default_config, **self.agent.config.get("evolution", {})}
+        logger.info(f"Loaded evolution configuration: {self.config}")
+        
+        # Set enabled flag
+        self.enabled = self.config.get('enabled', True)
         
         # Core settings
         self.enabled = self.evolution_config.get("enabled", True)
@@ -156,6 +280,14 @@ class EvolutionEngine:
         Returns:
             Dict containing evolution results
         """
+        # Initialize integration_results with default values
+        integration_results = {
+            'modules_created': 0,
+            'modules_removed': 0,
+            'integrated': [],
+            'failed': []
+        }
+        
         logger.info("🔍 Starting evolution cycle")
         
         # Check if evolution is already in progress
@@ -228,6 +360,8 @@ class EvolutionEngine:
             self._log_step('analysis', "Analyzing current system state")
             try:
                 analysis_results = self._analyze_system()
+                if not hasattr(self, 'current_cycle') or self.current_cycle is None:
+                    self.current_cycle = {}
                 self.current_cycle['analysis'] = analysis_results
                 self._log_step('analysis', "Analysis completed", status='completed')
                 
@@ -451,29 +585,32 @@ class EvolutionEngine:
             Dict containing analysis results and metrics
         """
         logger.info("🔍 Analyzing system state...")
-        if not self.enabled and not force:
-            msg = "[yellow]Evolution is disabled in configuration[/yellow]"
-            self.console.print(msg)
-            logger.warning("Evolution attempted but disabled in config")
-            return {"status": "disabled", "message": msg}
-
-        if self.is_evolving:
-            msg = "[yellow]Evolution already in progress[/yellow]"
-            self.console.print(msg)
-            logger.warning("Evolution already in progress")
-            return {"status": "busy", "message": msg}
-            
-        self.is_evolving = True
-        self.current_cycle = {
-            'start_time': time.time(),
-            'status': 'started',
-            'metrics': {},
-            'changes': {}
-        }
-
+        
         try:
+            # Check if evolution is enabled
+            if not getattr(self, 'enabled', False):
+                msg = "[yellow]Evolution is disabled in configuration[/yellow]"
+                self.console.print(msg)
+                logger.warning("Evolution attempted but disabled in config")
+                return {"status": "disabled", "message": msg}
+
+            # Check if already evolving
+            if getattr(self, 'is_evolving', False):
+                msg = "[yellow]Evolution already in progress[/yellow]"
+                self.console.print(msg)
+                logger.warning("Evolution already in progress")
+                return {"status": "busy", "message": msg}
+                
+            self.is_evolving = True
+            self.current_cycle = {
+                'start_time': time.time(),
+                'status': 'started',
+                'metrics': {},
+                'changes': {}
+            }
+
             # Check system resources
-            if not self._check_system_resources() and not force:
+            if not self._check_system_resources():
                 msg = "[yellow]Insufficient system resources for evolution[/yellow]"
                 self.console.print(msg)
                 return {"status": "resource_constrained", "message": msg}
@@ -481,15 +618,86 @@ class EvolutionEngine:
             self.console.print(Panel(
                 "[bold cyan]🧬 ELLMa Evolution Cycle Starting[/bold cyan]",
                 title="Self-Improvement",
-                subtitle=f"Cycle #{self.evolution_metrics['total_cycles'] + 1}",
+                subtitle=f"Cycle #{self.evolution_metrics.get('total_cycles', 0) + 1}",
                 border_style="cyan"
             ))
-
+            
+            # Collect system metrics
+            metrics = {
+                'timestamp': datetime.now().isoformat(),
+                'modules_count': len(getattr(self.agent, 'modules', {})),
+                'commands_count': len(getattr(self.agent, 'commands', {})),
+                'capabilities': list(getattr(self, 'capabilities', set())),
+                'errors': []
+            }
+            
+            # Add any error logs from recent operations
+            if hasattr(self, 'recent_errors') and self.recent_errors:
+                metrics['recent_errors'] = self.recent_errors
+                
+            return {
+                'status': 'success',
+                'message': 'System analysis completed',
+                'metrics': metrics,
+                'suggestions': self._identify_improvements(metrics)
+            }
+            
         except Exception as e:
-            error_msg = f"Failed to start evolution cycle: {str(e)}"
+            error_msg = f"Failed to analyze system: {str(e)}"
             logger.error(error_msg, exc_info=True)
+            return {
+                'status': 'error',
+                'message': error_msg,
+                'error': str(e)
+            }
+        finally:
             self.is_evolving = False
-            return {"status": "error", "message": error_msg}
+            
+    def _identify_improvements(self, metrics: Dict) -> List[Dict]:
+        """
+        Identify potential improvements based on system metrics
+        
+        Args:
+            metrics: System metrics from _analyze_system
+            
+        Returns:
+            List of suggested improvements with priorities
+        """
+        improvements = []
+        
+        # Check for missing core modules
+        core_modules = ['error_handling', 'logging', 'configuration']
+        existing_modules = set(metrics.get('capabilities', []))
+        missing_modules = [m for m in core_modules if m not in existing_modules]
+        
+        for module in missing_modules:
+            improvements.append({
+                'type': 'add_module',
+                'module': module,
+                'priority': 'high',
+                'reason': f'Core module {module} is missing'
+            })
+            
+        # Check for recent errors
+        if metrics.get('recent_errors'):
+            error_count = len(metrics['recent_errors'])
+            improvements.append({
+                'type': 'fix_errors',
+                'count': error_count,
+                'priority': 'critical' if error_count > 5 else 'high',
+                'reason': f'Found {error_count} recent errors in logs'
+            })
+            
+        # Suggest performance improvements if command count is high
+        if metrics.get('commands_count', 0) > 50:
+            improvements.append({
+                'type': 'optimize',
+                'area': 'command_handling',
+                'priority': 'medium',
+                'reason': 'High number of commands may impact performance'
+            })
+            
+        return improvements
 
     def _check_system_resources(self) -> bool:
         """
@@ -504,18 +712,21 @@ class EvolutionEngine:
             
             # Check available memory
             mem = psutil.virtual_memory()
-            min_memory_mb = 1024  # 1GB minimum
-            if mem.available < (min_memory_mb * 1024 * 1024):
-                logger.warning(f"Insufficient memory: {mem.available/(1024*1024):.1f}MB available, "
+            min_memory_mb = 512  # Reduced from 1GB to 512MB minimum
+            available_mb = mem.available / (1024 * 1024)
+            if available_mb < min_memory_mb:
+                logger.warning(f"Insufficient memory: {available_mb:.1f}MB available, "
                              f"{min_memory_mb}MB required")
                 return False
             
             # Check disk space
-            min_disk_space = 2 * 1024 * 1024 * 1024  # 2GB
+            min_disk_space = 1 * 1024 * 1024 * 1024  # Reduced from 2GB to 1GB
             _, _, free = shutil.disk_usage("/")
+            free_mb = free / (1024 * 1024)
+            min_disk_space_mb = min_disk_space / (1024 * 1024)
             if free < min_disk_space:
-                logger.warning(f"Insufficient disk space: {free/(1024*1024):.1f}MB available, "
-                             f"{min_disk_space/(1024*1024):.1f}MB required")
+                logger.warning(f"Insufficient disk space: {free_mb:.1f}MB available, "
+                             f"{min_disk_space_mb:.1f}MB required")
                 return False
             
             return True

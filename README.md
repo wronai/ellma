@@ -40,6 +40,39 @@ ELLMa is a revolutionary **self-evolving AI agent** that runs locally on your ma
 
 - **Performance Monitoring**: Built-in metrics and monitoring
 - **Cross-Platform**: Works on Linux, macOS, and Windows (WSL2 recommended for Windows)
+- **System Introspection**: Built-in commands for system exploration and debugging
+
+### System Introspection
+
+ELLMa includes powerful introspection capabilities to help you understand and debug the system:
+
+```python
+# View configuration
+sys config                # Show all configuration
+sys config model         # Show model configuration
+
+# Explore source code
+sys source ellma.core.agent.ELLMa  # View class source
+sys code ellma.commands.system     # View module source
+
+# System information
+sys info                 # Show detailed system info
+sys status               # Show system status
+sys health              # Run system health check
+
+# Module exploration
+sys modules             # List all available modules
+sys module ellma.core   # Show info about a module
+
+# Command help
+sys commands           # List all available commands
+sys help               # Show help for system commands
+```
+
+These commands support natural language queries, so you can type things like:
+- "show me the config" → `sys config`
+- "what modules are available" → `sys modules`
+- "display system information" → `sys info`
 
 ## ⚡ Quick Start
 

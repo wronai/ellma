@@ -1,10 +1,12 @@
 # TODO - ELLMa Improvement Plan
 
 ## Error Handling and Evolution
-- [ ] Create error logging system in ./TODO/ directory
-- [ ] Track errors with full context for evolution
+- [x] Create error logging system in ./TODO/ directory
+- [x] Track errors with full context for evolution
 - [ ] Implement error analysis for system improvement
 - [ ] Create evolution feedback loop based on logged errors
+- [ ] Add error pattern detection for common issues
+- [ ] Implement automatic recovery for known error patterns
 
 ## Module Structure
 Each module should follow this structure:
@@ -19,26 +21,50 @@ modules/
 ```
 
 ## Current Tasks
-1. Fix thread creation error during evolution
-   - Increase system limits (ulimit -u)
-   - Set OMP_NUM_THREADS environment variable
-   - Monitor system resources during execution
+1. System Introspection Enhancements
+   - [x] Add basic system introspection commands
+   - [ ] Add more natural language patterns for command matching
+   - [ ] Implement command suggestions for typos
+   - [ ] Add tab completion for command arguments
+   - [ ] Create interactive help system with examples
 
-2. Implement error tracking:
-   - Log all errors with context to ./TODO/errors.log
-   - Include stack traces and system state
-   - Track error frequency and patterns
+2. Error Tracking and Evolution
+   - [x] Log all errors with context to ./TODO/errors.log
+   - [x] Track error frequency and patterns
+   - [ ] Add automated error reporting
+   - [ ] Implement error severity levels
+   - [ ] Create error resolution suggestions
 
-3. Module development:
-   - Create base module template
-   - Implement module testing framework
-   - Add documentation requirements
+3. Module Development
+   - [x] Create base module template
+   - [ ] Implement module testing framework
+   - [ ] Add module documentation generator
+   - [ ] Create module dependency management
+   - [ ] Add module versioning support
 
 ## Long-term Goals
 - Implement multi-layered control system (like in ../inceptor)
 - Add testing and rollback system (like ../shellGuard)
 - Create task guard to prevent unintended actions
 - Improve error recovery and system resilience
+- Add AI-powered command prediction
+- Implement context-aware command suggestions
+- Create self-healing capabilities for common issues
+- Add performance optimization recommendations
+
+## Documentation Updates Needed
+- [x] Add system introspection commands to README
+- [ ] Create detailed user guide for system commands
+- [ ] Add examples for common troubleshooting scenarios
+- [ ] Document error codes and their meanings
+- [ ] Create video tutorials for key features
+
+## Recent Changes (2025-06-07)
+- Added system introspection module with natural language support
+- Implemented command mapping engine for natural language queries
+- Added rich console output for better readability
+- Created comprehensive help system
+- Improved error handling and logging
 
 ## Original Notes
 [Previous content preserved for reference]

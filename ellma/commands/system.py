@@ -11,9 +11,12 @@ import subprocess
 import platform
 import socket
 import time
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Any, Optional, Tuple
 from pathlib import Path
+import re
+from rich.text import Text
+from rich.panel import Panel
 
 import psutil
 from rich.console import Console
@@ -37,6 +40,72 @@ class SystemCommands(BaseCommand):
         super().__init__(agent)
         self.name = "system"
         self.console = Console()
+        
+    def config(self) -> Dict[str, Any]:
+        """
+        Display system and agent configuration
+        
+        Returns:
+            Dict containing system and agent configuration
+        """
+        config = {
+            'system': {
+                'platform': platform.system(),
+                'platform_version': platform.version(),
+                'machine': platform.machine(),
+                'processor': platform.processor(),
+                'python_version': platform.python_version(),
+                'hostname': socket.gethostname(),
+                'ip_address': socket.gethostbyname(socket.gethostname()),  
+            },
+            'resources': {
+                'cpu_cores': psutil.cpu_count(),
+                'total_memory_gb': round(psutil.virtual_memory().total / (1024**3), 2),
+                'total_disk_gb': round(psutil.disk_usage('/').total / (1024**3), 2)
+            },
+            'agent': {
+                'name': self.agent.config.get('name', 'ELLMa'),
+                'version': self.agent.config.get('version', '1.0.0'),
+                'environment': self.agent.config.get('environment', 'development'),
+                'log_level': self.agent.config.get('log_level', 'INFO'),
+                'modules_loaded': list(self.agent.modules.keys()) if hasattr(self.agent, 'modules') else []
+            }
+        }
+        
+        # Display the configuration in a nice format
+        self.console.print("\n[bold blue]System Configuration:[/bold blue]")
+        sys_table = Table(show_header=False, box=None)
+        sys_table.add_column("Key", style="cyan", width=20)
+        sys_table.add_column("Value", style="white")
+        
+        for key, value in config['system'].items():
+            sys_table.add_row(key.replace('_', ' ').title(), str(value))
+            
+        self.console.print(sys_table)
+        
+        self.console.print("\n[bold blue]Resource Information:[/bold blue]")
+        res_table = Table(show_header=False, box=None)
+        res_table.add_column("Resource", style="cyan", width=20)
+        res_table.add_column("Value", style="white")
+        
+        for key, value in config['resources'].items():
+            res_table.add_row(key.replace('_', ' ').title(), str(value) + (" GB" if key != 'cpu_cores' else " cores"))
+            
+        self.console.print(res_table)
+        
+        self.console.print("\n[bold blue]Agent Configuration:[/bold blue]")
+        agent_table = Table(show_header=False, box=None)
+        agent_table.add_column("Setting", style="cyan", width=20)
+        agent_table.add_column("Value", style="white")
+        
+        for key, value in config['agent'].items():
+            if isinstance(value, list):
+                value = ", ".join(value) if value else "None"
+            agent_table.add_row(key.replace('_', ' ').title(), str(value))
+            
+        self.console.print(agent_table)
+        
+        return config
 
     def scan(self, quick: bool = False) -> Dict[str, Any]:
         """
@@ -601,6 +670,155 @@ class SystemCommands(BaseCommand):
                     continue
 
         return cleaned_count
+        
+    def _parse_log_line(self, line: str) -> Optional[Tuple[datetime, str, str, str]]:
+        """Parse a log line into timestamp, level, logger, and message."""
+        # Example log format: 2023-11-15 12:34:56,789 - module.name - LEVEL - Message
+        pattern = r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - ([^ ]+) - ([A-Z]+) - (.+)'
+        match = re.match(pattern, line)
+        if not match:
+            return None
+            
+        timestamp_str, logger_name, level, message = match.groups()
+        try:
+            # Convert timestamp string to datetime object
+            timestamp = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S,%f')
+            return timestamp, level, logger_name, message
+        except ValueError:
+            return None
+    
+    def _get_log_files(self, log_type: str = 'system') -> List[Path]:
+        """Get log files for the specified log type."""
+        log_dir = Path.home() / ".ellma" / "logs"
+        if log_type == 'system':
+            return sorted(log_dir.glob('system.log*'))
+        elif log_type == 'chat':
+            return sorted(log_dir.glob('chat.log*'))
+        return []
+    
+    def _read_logs(self, log_type: str = 'system', since: timedelta = None) -> List[str]:
+        """Read logs of specified type, optionally filtered by time."""
+        log_files = self._get_log_files(log_type)
+        if not log_files:
+            return []
+            
+        cutoff_time = datetime.now(timezone.utc) - since if since else None
+        all_entries = []
+        
+        for log_file in reversed(log_files):  # Start from most recent logs first
+            try:
+                # Handle compressed logs
+                if log_file.suffix == '.gz':
+                    import gzip
+                    with gzip.open(log_file, 'rt', encoding='utf-8') as f:
+                        lines = f.readlines()
+                else:
+                    with open(log_file, 'r', encoding='utf-8') as f:
+                        lines = f.readlines()
+                
+                # Process lines in reverse order (newest first)
+                for line in reversed(lines):
+                    line = line.strip()
+                    if not line:
+                        continue
+                        
+                    parsed = self._parse_log_line(line)
+                    if not parsed:
+                        all_entries.append((None, line))
+                        continue
+                        
+                    timestamp, level, logger_name, message = parsed
+                    if cutoff_time and timestamp < cutoff_time:
+                        return all_entries  # Stop if we've gone past the cutoff
+                        
+                    all_entries.append((timestamp, f"{timestamp} - {logger_name} - {level} - {message}"))
+                    
+            except Exception as e:
+                logger.warning(f"Error reading log file {log_file}: {e}")
+                
+        return [entry[1] for entry in all_entries if entry[1]]
+    
+    def logs(self, log_type: str = 'system', hours: int = 1, tail: int = 50, level: str = None) -> None:
+        """
+        Display recent log entries
+        
+        Args:
+            log_type: Type of logs to display ('system' or 'chat')
+            hours: Number of hours of logs to show (0 for all)
+            tail: Number of most recent lines to show (0 for all)
+            level: Minimum log level to display (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        """
+        if log_type not in ['system', 'chat']:
+            self.console.print("[red]Error:[/red] log_type must be 'system' or 'chat'")
+            return
+            
+        since = timedelta(hours=hours) if hours > 0 else None
+        log_entries = self._read_logs(log_type, since)
+        
+        # Apply level filter if specified
+        if level and level.upper() in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
+            min_level = getattr(logging, level.upper())
+            log_entries = [
+                entry for entry in log_entries
+                if self._get_log_level(entry) >= min_level
+            ]
+        
+        # Apply tail filter
+        if tail > 0:
+            log_entries = log_entries[-tail:]
+        
+        # Display logs in a table
+        table = Table(show_header=True, header_style="bold magenta", box=None)
+        table.add_column("Timestamp", style="dim", width=20)
+        table.add_column("Logger", style="blue", width=30)
+        table.add_column("Level", style="green", width=10)
+        table.add_column("Message", style="")
+        
+        for entry in log_entries:
+            parsed = self._parse_log_line(entry)
+            if parsed:
+                timestamp, level, logger_name, message = parsed
+                level_style = self._get_level_style(level)
+                table.add_row(
+                    timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                    logger_name,
+                    f"[{level_style}]{level}[/{level_style}]",
+                    message
+                )
+            else:
+                table.add_row("", "", "", entry)
+        
+        self.console.print(Panel.fit(
+            table if log_entries else "No log entries found",
+            title=f"{log_type.capitalize()} Logs",
+            border_style="blue"
+        ))
+    
+    def _get_level_style(self, level: str) -> str:
+        """Get rich style for log level."""
+        styles = {
+            'DEBUG': 'cyan',
+            'INFO': 'green',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'bold red'
+        }
+        return styles.get(level, '')
+    
+    def _get_log_level(self, log_entry: str) -> int:
+        """Get numeric log level from log entry."""
+        level_map = {
+            'DEBUG': logging.DEBUG,
+            'INFO': logging.INFO,
+            'WARNING': logging.WARNING,
+            'ERROR': logging.ERROR,
+            'CRITICAL': logging.CRITICAL
+        }
+        
+        for level_name, level_num in level_map.items():
+            if f" - {level_name} - " in log_entry:
+                return level_num
+        return logging.DEBUG  # Default to DEBUG if level not found
 
     def _display_scan_summary(self, scan_results: Dict):
         """Display scan results summary"""
