@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "ellma"
-version = "0.1.8"
+version = "0.1.9"
 description = "Evolutionary Local LLM Agent - Self-improving AI assistant"
 authors = [
     {name = "Tom Sapletta", email = "info@softreck.dev"}
