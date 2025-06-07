@@ -1,3 +1,4 @@
+![img_1.png](ellma-init.png)
 # 🧬 ELLMa - Evolutionary Local LLM Agent
 
 > **E**volutionary **L**ocal **LLM** **A**gent - Self-improving AI assistant that evolves with your needs

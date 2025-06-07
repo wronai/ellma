@@ -351,11 +351,17 @@ class ELLMa:
 
     def _execute_structured_command(self, command: str, *args, **kwargs) -> Any:
         """Execute structured command (module.action format)"""
-        parts = command.split('.')
-        if len(parts) != 2:
-            raise CommandError("Command format must be 'module.action'")
+        # Split command into parts and arguments
+        parts = command.split(' ', 1)
+        command_part = parts[0]
+        command_args = parts[1] if len(parts) > 1 else ""
+        
+        # Split module.action
+        module_action = command_part.split('.')
+        if len(module_action) != 2:
+            raise CommandError("Command format must be 'module.action [arguments]'")
 
-        module_name, action = parts
+        module_name, action = module_action
 
         if module_name not in self.commands:
             raise CommandError(f"Module '{module_name}' not found. Available: {list(self.commands.keys())}")
@@ -365,7 +371,13 @@ class ELLMa:
             available_actions = [attr for attr in dir(module) if not attr.startswith('_')]
             raise CommandError(f"Action '{action}' not found in module '{module_name}'. Available: {available_actions}")
 
-        return getattr(module, action)(*args, **kwargs)
+        # Get the method
+        method = getattr(module, action)
+        
+        # If there are command line arguments, pass them as a single string
+        if command_args:
+            return method(command_args, *args, **kwargs)
+        return method(*args, **kwargs)
 
     def _execute_natural_command(self, command: str, *args, **kwargs) -> Any:
         """Execute natural language command using LLM"""
@@ -465,45 +477,139 @@ class ELLMa:
             return {}
 
     def _should_evolve(self) -> bool:
-        """Determine if evolution should be triggered"""
-        # Evolution triggers
+        """
+        Determine if evolution should be triggered based on performance metrics.
+        
+        Returns:
+            bool: True if evolution should be triggered, False otherwise
+        """
+        # Evolution triggers configuration
         commands_threshold = 50
         failure_rate_threshold = 0.2
-        time_since_last_evolution = 3600  # 1 hour
-
-        # Check command count
-        if self.performance_metrics['commands_executed'] % commands_threshold == 0:
+        min_commands_for_failure_check = 10
+        
+        # Log current metrics
+        logger.debug("🔍 Checking evolution conditions...")
+        logger.debug(f"📊 Current metrics - Commands: {self.performance_metrics['commands_executed']}, "
+                   f"Success: {self.performance_metrics['successful_executions']}, "
+                   f"Failures: {self.performance_metrics.get('failed_executions', 0)}")
+        
+        # Check command count threshold
+        commands_executed = self.performance_metrics['commands_executed']
+        if commands_executed > 0 and commands_executed % commands_threshold == 0:
+            logger.info(f"✅ Evolution triggered: Reached {commands_executed} commands (threshold: {commands_threshold})")
             return True
-
-        # Check failure rate
+            
+        # Check failure rate if we have enough commands for meaningful statistics
         total_executions = (self.performance_metrics['successful_executions'] +
-                            self.performance_metrics['failed_executions'])
-        if total_executions > 10:
-            failure_rate = self.performance_metrics['failed_executions'] / total_executions
+                          self.performance_metrics.get('failed_executions', 0))
+                          
+        if total_executions >= min_commands_for_failure_check:
+            failure_rate = self.performance_metrics.get('failed_executions', 0) / total_executions
+            logger.debug(f"📉 Current failure rate: {failure_rate:.1%} (threshold: {failure_rate_threshold:.1%})")
+            
             if failure_rate > failure_rate_threshold:
+                logger.warning(f"⚠️  Evolution triggered: High failure rate {failure_rate:.1%} "
+                            f"(threshold: {failure_rate_threshold:.1%})")
                 return True
-
+        
+        logger.debug("ℹ️  Evolution not triggered - conditions not met")
         return False
 
     def _trigger_evolution(self):
         """Trigger automatic evolution"""
+        logger.info("🔍 Starting automatic evolution process...")
+        start_time = time.time()
+        
         try:
             from ellma.core.evolution import EvolutionEngine
+            
+            logger.info("🔄 Initializing Evolution Engine...")
             evolution = EvolutionEngine(self)
-            evolution.evolve()
+            
+            # Log evolution configuration
+            logger.info(f"📊 Evolution configuration: {evolution.get_config() if hasattr(evolution, 'get_config') else 'Not available'}")
+            
+            logger.info("🚀 Starting evolution...")
+            result = evolution.evolve()
+            
+            # Log evolution results
+            duration = time.time() - start_time
+            logger.info(f"✅ Evolution completed successfully in {duration:.2f} seconds")
+            
+            if isinstance(result, dict):
+                logger.info("📋 Evolution summary:")
+                for key, value in result.items():
+                    logger.info(f"   • {key}: {value}")
+            
+            return result
+            
+        except ImportError as e:
+            error_msg = f"❌ Failed to import EvolutionEngine: {e}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg) from e
+            
         except Exception as e:
-            logger.error(f"Auto-evolution failed: {e}")
+            error_msg = f"❌ Auto-evolution failed after {time.time() - start_time:.2f}s: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
 
-    def evolve(self) -> Dict:
+    def evolve(self, verbose: bool = True) -> Dict:
         """
         Manually trigger evolution process
 
+        Args:
+            verbose: If True, print detailed progress information
+
         Returns:
-            Evolution results
+            Dict containing evolution results and statistics
+
+        Raises:
+            RuntimeError: If evolution fails
         """
-        from ellma.core.evolution import EvolutionEngine
-        evolution = EvolutionEngine(self)
-        return evolution.evolve()
+        if verbose:
+            logger.info("🔍 Starting manual evolution process...")
+            logger.info("This process will analyze the current state and generate improvements")
+        
+        try:
+            from ellma.core.evolution import EvolutionEngine
+            
+            if verbose:
+                logger.info("🔄 Initializing Evolution Engine...")
+                
+            evolution = EvolutionEngine(self)
+            
+            if verbose:
+                config = evolution.get_config() if hasattr(evolution, 'get_config') else {}
+                logger.info(f"📊 Evolution configuration: {config}")
+                logger.info("🚀 Beginning evolution process...")
+                
+            result = evolution.evolve()
+            
+            if verbose and isinstance(result, dict):
+                logger.info("✅ Evolution completed successfully!")
+                logger.info("📋 Results summary:")
+                for key, value in result.items():
+                    if isinstance(value, (str, int, float, bool)):
+                        logger.info(f"   • {key}: {value}")
+                    elif value is not None:
+                        logger.info(f"   • {key}: {type(value).__name__}")
+            
+            return result
+            
+        except ImportError as e:
+            error_msg = "❌ Failed to import EvolutionEngine. Make sure all dependencies are installed."
+            logger.error(error_msg)
+            if verbose:
+                logger.error(f"Error details: {str(e)}")
+            raise RuntimeError(error_msg) from e
+            
+        except Exception as e:
+            error_msg = "❌ Evolution process failed"
+            logger.error(error_msg)
+            if verbose:
+                logger.error(f"Error details: {str(e)}", exc_info=True)
+            raise RuntimeError(f"{error_msg}: {str(e)}") from e
 
     def shell(self):
         """Start interactive shell"""

@@ -1,66 +1,117 @@
-# ellma Project Makefile
+# ELLMa Project Makefile
 # Development and build automation
 
-.PHONY: help install dev-install test lint format clean build publish docs serve-docs
+.PHONY: help install dev-install test lint format clean build publish docs serve-docs init shell run
 
-# Default target
-help: ## Show this help message
-	@echo "ellma - Project Command Detector"
-	@echo "================================="
-	@echo "Available commands:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
+# Default variables
+PYTHON ?= python3
+PIP ?= pip
+POETRY ?= poetry
+MODEL_URL ?= "https://huggingface.co/TheBloke/Mistral-7B-v0.1-GGUF/resolve/main/mistral-7b-v0.1.Q4_K_M.gguf"
+MODEL_DIR = $(HOME)/.ellma/models
+MODEL_FILE = $(MODEL_DIR)/mistral-7b.gguf
 
-# Installation targets
+# Colors
+GREEN  := $(shell tput -Txterm setaf 2)
+YELLOW := $(shell tput -Txterm setaf 3)
+WHITE  := $(shell tput -Txterm setaf 7)
+RESET  := $(shell tput -Txterm sgr0)
+
+##@ Help
+
+# The help target prints out all targets with their descriptions
+help:  ## Display this help
+	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*?##/ { printf "  ${YELLOW}%-20s${GREEN}%s${RESET}\n", $$1, $$2 } /^##@/ { printf "\n${WHITE}%s${RESET}\n", substr($$0, 5) } ' $(MAKEFILE_LIST) | column -ts:
+
+##@ Development
+
+init: ## Initialize development environment
+	@echo "${GREEN}Initializing development environment...${RESET}"
+	$(PYTHON) -m pip install --upgrade pip
+	$(PYTHON) -m pip install poetry
+	$(POETRY) install --with dev
+	@echo "${GREEN}✓ Development environment ready${RESET}"
+
+shell: ## Start interactive shell
+	$(POETRY) run ellma shell
+
+run: ## Run ellma with default command
+	$(POETRY) run ellma $(ARGS)
+
+download-model: ## Download the default model
+	@echo "${GREEN}Downloading model...${RESET}"
+	@mkdir -p $(MODEL_DIR)
+	curl -L $(MODEL_URL) -o $(MODEL_FILE)
+	@echo "${GREEN}✓ Model downloaded to $(MODEL_FILE)${RESET}"
+
+##@ Installation
+
 install: ## Install the package
-	poetry install --no-root
+	$(POETRY) install --no-root
 
 install-dev: ## Install with development dependencies
-	poetry install --with dev --extras "docs"
-	poetry run pre-commit install
+	$(POETRY) install --with dev --extras "docs"
+	$(POETRY) run pre-commit install
 
 install-all: ## Install with all optional dependencies
-	poetry install --with dev,web,audio,full,docs
+	$(POETRY) install --with dev,web,audio,full,docs
 
-# Testing targets
+uninstall: ## Uninstall the package
+	$(PIP) uninstall -y ellma
+	@echo "${GREEN}✓ Package uninstalled${RESET}"
+
+##@ Testing
+
 test: ## Run all tests
-	@echo "Running all tests..."
-	poetry run pytest
+	@echo "${GREEN}Running all tests...${RESET}"
+	$(POETRY) run pytest
 
-test-unit: ## Run unit tests only
-	@echo "Running unit tests..."
-	poetry run pytest -m "unit"
+unit: ## Run unit tests only
+	@echo "${GREEN}Running unit tests...${RESET}"
+	$(POETRY) run pytest -m "unit"
 
-test-integration: ## Run integration tests only
-	@echo "Running integration tests..."
-	poetry run pytest -m "integration"
+integration: ## Run integration tests only
+	@echo "${GREEN}Running integration tests...${RESET}"
+	$(POETRY) run pytest -m "integration"
 
-test-cov: ## Run tests with coverage report
-	poetry run pytest --cov=ellma --cov-report=html --cov-report=term
+coverage: ## Run tests with coverage report
+	@echo "${GREEN}Generating test coverage report...${RESET}"
+	$(POETRY) run pytest --cov=ellma --cov-report=term-missing --cov-report=html
+
+coverage-html: ## Generate and open HTML coverage report
+	$(POETRY) run pytest --cov=ellma --cov-report=html
+	xdg-open htmlcov/index.html
 
 test-verbose: ## Run tests with verbose output
-	poetry run pytest -v
+	$(POETRY) run pytest -v -s
 
-coverage: ## Generate test coverage report
-	@echo "Generating test coverage report..."
-	poetry run pytest --cov=ellma --cov-report=term-missing --cov-report=html
+quick-test: ## Run quick test suite (faster, less verbose)
+	$(POETRY) run pytest -xvs --tb=short tests/unit/
 
-# Code quality targets
-lint: ## Run all linting tools
-	poetry run black --check ellma/ tests/
-	poetry run flake8 ellma/ tests/
-	poetry run mypy ellma/
+##@ Code Quality
+
+lint: ## Run all linters
+	@echo "${GREEN}Running linters...${RESET}"
+	$(POETRY) run black --check ellma/ tests/
+	$(POETRY) run isort --check-only ellma/ tests/
+	$(POETRY) run flake8 ellma/ tests/
+	$(POETRY) run mypy ellma/
 
 format: ## Format code with black and isort
-	poetry run black ellma/ tests/
+	@echo "${GREEN}Formatting code...${RESET}"
+	$(POETRY) run black ellma/ tests/
+	$(POETRY) run isort ellma/ tests/
 
-format-check: ## Check if code is properly formatted
-	poetry run black --check ellma/ tests/
+format-check: ## Check code formatting without making changes
+	@echo "${GREEN}Checking code formatting...${RESET}"
+	$(POETRY) run black --check ellma/ tests/
+	$(POETRY) run isort --check-only ellma/ tests/
 
-mypy: ## Run type checking
-	poetry run mypy ellma/
+typecheck: ## Run type checking with mypy
+	@echo "${GREEN}Running type checking...${RESET}"
+	$(POETRY) run mypy ellma/
 
-flake8: ## Run flake8 linter
-	poetry run flake8 ellma/ tests/
+check: lint typecheck test ## Run all checks (lint, typecheck, test)
 
 # Build and publish targets
 clean: ## Clean build artifacts
