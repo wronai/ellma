@@ -103,21 +103,103 @@ These commands support natural language queries, so you can type things like:
 - "what modules are available" → `sys modules`
 - "display system information" → `sys info`
 
-## 🛡️ Security First
+## 🛡️ Security and Dependency Management
 
-ELLMa includes a robust security layer that runs before any code execution to ensure a safe and consistent environment:
+ELLMa includes a comprehensive security and dependency management system that ensures safe and reliable execution:
 
-1. **Environment Validation**: Verifies Python version, virtual environment, and dependencies
-2. **Auto-Repair**: Automatically installs missing dependencies when possible
-3. **Secure Execution**: Runs in an isolated environment with proper permissions
-4. **Dependency Management**: Uses Poetry for reliable dependency resolution
+### 🔒 Security Features
 
-### Security Features
-
-- **Dependency Isolation**: Each component runs with minimal required permissions
-- **Environment Sandboxing**: Critical operations run in isolated environments
+- **Secure Code Execution**: All code runs in a sandboxed environment with restricted permissions
+- **Dependency Validation**: Automatic verification of required packages and versions
+- **Environment Isolation**: Each component runs in its own isolated environment
+- **Audit Logging**: Detailed logging of all security-relevant actions
+- **Automatic Repair**: Self-healing capabilities for common issues
 - **Secure Defaults**: Secure by default with sensible restrictions
-- **Audit Logging**: All security-relevant actions are logged
+
+### 📦 Dependency Management
+
+- **Automatic Dependency Resolution**: Automatically installs missing dependencies
+- **Version Conflict Resolution**: Handles version conflicts gracefully
+- **Dependency Isolation**: Each module can specify its own dependencies
+- **Security Scanning**: Regular security scans for known vulnerabilities
+
+### 🛠️ Using the Secure Executor
+
+Run any Python script or module securely:
+
+```bash
+# Run a script with dependency checking
+ellma-secure path/to/script.py
+
+# Interactive secure Python shell
+ellma-secure
+
+# Install dependencies from requirements.txt
+ellma-secure --requirements requirements.txt
+```
+
+### 🛡️ Security Context Manager
+
+Use the security context manager in your code:
+
+```python
+from ellma.core.security import SecurityContext, Dependency
+
+# Define dependencies
+dependencies = [
+    Dependency(name="numpy", min_version="1.20.0"),
+    Dependency(name="pandas", min_version="1.3.0")
+]
+
+# Run code in a secure context
+with SecurityContext(dependencies):
+    import numpy as np
+    import pandas as pd
+    # Your secure code here
+```
+
+### 🔄 Automatic Dependency Checking
+
+Add dependency checking to any function:
+
+```python
+from ellma.core.decorators import secure
+from ellma.core.security import Dependency
+
+@secure(dependencies=[
+    Dependency(name="requests", min_version="2.25.0"),
+    Dependency(name="numpy", min_version="1.20.0")
+])
+def process_data(url: str) -> dict:
+    import requests
+    import numpy as np
+    # Your function code here
+```
+
+### 🚀 Setup and Configuration
+
+1. **Install development dependencies**:
+   ```bash
+   poetry install --with dev
+   ```
+
+2. **Run security checks**:
+   ```bash
+   # Run bandit security scanner
+   bandit -r ellma/
+   
+   # Check for vulnerable dependencies
+   safety check
+   ```
+
+3. **Update dependencies**:
+   ```bash
+   # Update all dependencies
+   poetry update
+   
+   # Update a specific package
+   poetry update package-name
+   ```
 
 ## ⚡ Quick Start
 
