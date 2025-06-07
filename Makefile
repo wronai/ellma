@@ -229,9 +229,6 @@ tag: ## Create git tag with current version
 # Development workflow shortcuts
 dev: install-dev format lint test ## Full development setup and check
 
-quick-test: ## Quick test run (unit tests only)
-	poetry run pytest tests/ -x -v --tb=short
-
 # Release workflow
 release-check: ## Check if ready for release
 	@echo "Checking release readiness..."
