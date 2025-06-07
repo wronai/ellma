@@ -54,16 +54,23 @@ def test_check_directory_permissions(tmp_path):
     subdir.mkdir()
     subdir.chmod(0o700)
     
+    # Create files with different permissions
     secure_file = test_dir / "secure.txt"
     secure_file.write_text("secure")
     secure_file.chmod(0o600)  # rw-------
     
+    # Create a file with group/other write permissions (insecure)
     insecure_file = test_dir / "insecure.txt"
     insecure_file.write_text("insecure")
     insecure_file.chmod(0o666)  # rw-rw-rw-
     
-    # Check permissions
-    results = check_directory_permissions(test_dir)
+    # Create a file with group/other read permissions (insecure for sensitive files)
+    readable_file = test_dir / "readable.txt"
+    readable_file.write_text("readable")
+    readable_file.chmod(0o644)  # rw-r--r--
+    
+    # Check permissions with strict settings (only owner should have any access)
+    results = check_directory_permissions(test_dir, max_permissions=0o600, owner_only=True)
     
     # Debug output
     print("\nSecure items:")
@@ -73,15 +80,21 @@ def test_check_directory_permissions(tmp_path):
     for item in sorted(results['insecure']):
         print(f"- {item}")
     
-    # Should find all secure and insecure items
-    # The exact count might vary based on the test environment
-    assert len(results['secure']) >= 2  # At least the directory and secure file
-    assert len(results['insecure']) == 1  # The insecure file
-    
-    # Specific checks for expected items
+    # Should find the secure file and directory
     assert str(test_dir) + '/' in results['secure']
     assert str(secure_file) in results['secure']
-    assert str(insecure_file) in [i.split(':')[0] for i in results['insecure']]
+    
+    # Should flag the insecure files
+    insecure_paths = [i.split(':')[0] for i in results['insecure']]
+    assert str(insecure_file) in insecure_paths
+    assert str(readable_file) in insecure_paths
+    
+    # Should have at least 2 insecure items (insecure.txt and readable.txt)
+    assert len(results['insecure']) >= 2
+    
+    # Check that the error message contains the expected permission info
+    error_messages = '\n'.join(results['insecure'])
+    assert "insecure permissions" in error_messages.lower() or "permissions too permissive" in error_messages.lower()
 
 
 @patch('ellma.security.validations.logger')

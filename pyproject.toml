@@ -19,6 +19,10 @@ psutil = "^5.9.0"
 llama-cpp-python = "^0.2.0"
 numpy = "^1.21.0"
 prompt-toolkit = "^3.0.0"
+# Security and dependency management
+importlib-metadata = {version = "^6.0.0", python = "<3.8"}  # For Python 3.7 compatibility
+packaging = "^21.0"  # For version parsing
+pkg-resources = "^0.0.0"  # For dependency management
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/wronai/ellma/issues"
@@ -32,14 +36,40 @@ Source = "https://github.com/wronai/ellma"
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.poetry.extras]
+security = [
+    "cryptography>=41.0.0",
+    "PyJWT>=2.4.0"
+]
+
+# Security configuration
+[tool.bandit]
+targets = ["ellma"]
+recursive = true
+skips = ["B101", "B104"]  # Skip assert_used and hardcoded_bind_all_interfaces
+
+[tool.safety]
+# Ignore known vulnerabilities in test dependencies
+ignore = [
+    "51457",  # py
+    "44715",  # pyyaml
+    "51668"   # numpy
+]
+
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0.0"
 pytest-asyncio = "^0.20.0"
 pytest-cov = "^4.0.0"
+pytest-mock = "^3.10.0"
 black = "^22.0.0"
 flake8 = "^5.0.0"
+flake8-bugbear = "^23.0.0"
+flake8-docstrings = "^1.7.0"
+flake8-import-order = "^0.18.2"
 mypy = "^0.991"
 pre-commit = "^2.20.0"
+safety = "^2.3.0"  # For security scanning
+bandit = "^1.7.0"  # For security scanning
 sphinx = "^7.0.0"
 sphinx-rtd-theme = "^1.2.0"
 sphinx-autodoc-typehints = "^1.22.0"
@@ -47,6 +77,13 @@ myst-parser = "^2.0.0"
 sphinx-copybutton = "^0.5.0"
 sphinxcontrib-mermaid = "^0.8.0"
 sphinx-autobuild = "^2021.3.14"
+# Development tools
+tox = "^4.0.0"
+invoke = "^2.0.0"
+pip-tools = "^6.0.0"
+# For security module
+cryptography = "^41.0.0"
+PyJWT = "^2.4.0"
 
 [tool.poetry.group.web.dependencies]
 fastapi = "^0.100.0"
@@ -69,6 +106,10 @@ beautifulsoup4 = "^4.11.0"
 ellma = "ellma.cli.main:cli"
 ellma-shell = "ellma.cli.shell:interactive_shell"
 ellma-evolve = "ellma.core.evolution:evolve_cli"
+ellma-secure = "ellma.secure_executor:main"
+
+[project.scripts]
+ellma-secure = "ellma.secure_executor:main"
 
 
 [tool.black]
@@ -99,6 +140,33 @@ check_untyped_defs = true
 disallow_untyped_decorators = true
 no_implicit_optional = true
 warn_redundant_casts = true
+
+# Ignore missing imports for optional dependencies
+[[tool.mypy.overrides]]
+module = [
+    "pytest",
+    "pytest_cov",
+    "pytest_mock",
+    "sphinx",
+    "sphinx_rtd_theme",
+    "myst_parser",
+    "sphinx_autodoc_typehints",
+    "sphinx_copybutton",
+    "sphinxcontrib.mermaid",
+    "sphinx_autobuild",
+    "fastapi",
+    "uvicorn",
+    "websockets",
+    "aiofiles",
+    "sounddevice",
+    "scipy",
+    "librosa",
+    "whisper",
+    "docker",
+    "paramiko",
+    "beautifulsoup4"
+]
+ignore_missing_imports = true
 warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
