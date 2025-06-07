@@ -1,0 +1,5 @@
+# Module registry
+"""
+registry.py
+"""
+

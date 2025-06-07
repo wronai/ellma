@@ -1,0 +1,54 @@
+ellma/
+├── setup.py                 # Package configuration
+├── pyproject.toml          # Modern Python packaging
+├── README.md               # Documentation
+├── requirements.txt        # Dependencies
+├── MANIFEST.in            # Package files
+├── ellma/
+│   ├── __init__.py        # Package init + version
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── agent.py       # Main LLM Agent class
+│   │   ├── evolution.py   # Self-improvement engine
+│   │   ├── shell.py       # Shell command interface
+│   │   └── modular.py     # Module management
+│   ├── commands/
+│   │   ├── __init__.py
+│   │   ├── base.py        # Base command class
+│   │   ├── system.py      # System commands
+│   │   ├── web.py         # Web-related commands
+│   │   └── files.py       # File operations
+│   ├── generators/
+│   │   ├── __init__.py
+│   │   ├── bash.py        # Bash script generator
+│   │   ├── python.py      # Python code generator
+│   │   ├── groovy.py      # Groovy script generator
+│   │   └── docker.py      # Docker/compose generator
+│   ├── modules/
+│   │   ├── __init__.py
+│   │   ├── registry.py    # Module registry
+│   │   └── loader.py      # Dynamic module loader
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── logger.py      # Logging utilities
+│   │   ├── config.py      # Configuration management
+│   │   └── helpers.py     # Common utilities
+│   └── cli/
+│       ├── __init__.py
+│       └── main.py        # CLI entry point
+├── scripts/
+│   ├── install.sh         # Installation script
+│   └── bootstrap.py       # Bootstrap new agent
+├── templates/
+│   ├── commands/          # Command templates
+│   ├── scripts/           # Script templates
+│   └── modules/           # Module templates
+├── docs/
+│   ├── getting_started.md
+│   ├── evolution_guide.md
+│   └── api_reference.md
+└── tests/
+    ├── __init__.py
+    ├── test_core.py
+    ├── test_commands.py
+    └── test_evolution.py

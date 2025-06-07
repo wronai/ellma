@@ -1,0 +1,5 @@
+# Package configuration
+"""
+setup.py
+"""
+
