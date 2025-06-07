@@ -328,28 +328,58 @@ def test_check_network_access_unauthorized():
     assert findings[0].severity == SecurityCheckSeverity.HIGH
     assert "unauthorized_network_access" in findings[0].check_name
 
-def test_validate_environment(tmp_path):
+def test_validate_environment(tmp_path, monkeypatch):
     """Test the full environment validation."""
-    # Create a test project structure
-    (tmp_path / "pyproject.toml").touch()
-    (tmp_path / "poetry.lock").touch()
+    # Create a test project structure with secure permissions
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.touch(mode=0o600)
+    
+    poetry_lock = tmp_path / "poetry.lock"
+    poetry_lock.touch(mode=0o600)
     
     # Create a test .env file with secure permissions
     env_file = tmp_path / ".env"
-    env_file.touch()
-    env_file.chmod(0o600)
+    env_file.touch(mode=0o600)
     
     # Create a test config file with secure permissions
     config_file = tmp_path / "config.yaml"
-    config_file.touch()
-    config_file.chmod(0o600)
+    config_file.touch(mode=0o600)
     
     # Create a test directory with secure permissions
-    (tmp_path / "src").mkdir()
-    (tmp_path / "src").chmod(0o750)
+    src_dir = tmp_path / "src"
+    src_dir.mkdir(mode=0o750)
     
+    # Verify permissions were set correctly
+    assert (pyproject.stat().st_mode & 0o777) == 0o600
+    assert (poetry_lock.stat().st_mode & 0o777) == 0o600
+    assert (env_file.stat().st_mode & 0o777) == 0o600
+    assert (config_file.stat().st_mode & 0o777) == 0o600
+    assert (src_dir.stat().st_mode & 0o777) == 0o750
+    
+    # Create validator and run validation
     validator = SecurityValidator(project_root=tmp_path)
-    assert validator.validate_environment() is True
+    
+    # Run validation and capture results
+    result = validator.validate_environment()
+    findings = validator.get_findings()
+    
+    # Print findings if validation failed
+    if not result or findings:
+        print("\n=== Validation Failed ===")
+        print(f"Result: {result}")
+        print(f"Number of findings: {len(findings)}")
+        for i, finding in enumerate(findings, 1):
+            print(f"\nFinding {i}:")
+            print(f"- Check: {finding.check_name}")
+            print(f"- Severity: {finding.severity}")
+            print(f"- Description: {finding.description}")
+            if hasattr(finding, 'details'):
+                print("- Details:", finding.details)
+            if hasattr(finding, 'remediation'):
+                print("- Remediation:", finding.remediation)
+    
+    assert result is True
+    assert len(findings) == 0
     assert len(validator.get_findings()) == 0
 
 def test_validate_environment_insecure(tmp_path):

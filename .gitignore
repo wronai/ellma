@@ -3,6 +3,8 @@ TODO.txt
 venv*
 .venv*
 .env*
+poetry.lock
+
 # Logs
 logs
 *.log
