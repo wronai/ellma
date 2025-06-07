@@ -154,19 +154,34 @@ def test_validate_environment(tmp_path, monkeypatch):
         def __init__(self, mode):
             self.st_mode = mode
     
+    # Track which paths should be treated as files vs directories
+    test_files = {str(pyproject), str(poetry_lock), str(env_file), str(config_file)}
+    test_dirs = {str(src_dir)}
+    
+    # Mock os.path.isfile and os.path.isdir
+    def mock_isfile(path):
+        path = str(path)
+        return path in test_files or any(f in path for f in test_files)
+    
+    def mock_isdir(path):
+        path = str(path)
+        return path in test_dirs or any(d in path for d in test_dirs)
+    
     # Mock os.stat to return our controlled permissions
     def mock_stat(path, *args, **kwargs):
         path = str(path)
-        if 'pyproject.toml' in path or 'poetry.lock' in path or '.env' in path or 'config.yaml' in path:
+        if any(f in path for f in test_files):
             # Return secure file permissions (0o600)
             return MockStat(0o100600)  # Regular file with 600 permissions
-        elif 'src' in path and os.path.isdir(path):
+        elif any(d in path for d in test_dirs):
             # Return secure directory permissions (0o750)
             return MockStat(0o040750)  # Directory with 750 permissions
         return os.stat(path, *args, **kwargs)
     
-    # Apply the mock
+    # Apply the mocks
     monkeypatch.setattr('os.stat', mock_stat)
+    monkeypatch.setattr('os.path.isfile', mock_isfile)
+    monkeypatch.setattr('os.path.isdir', mock_isdir)
     
     # Create validator and run validation
     validator = SecurityValidator(project_root=tmp_path)
@@ -174,8 +189,12 @@ def test_validate_environment(tmp_path, monkeypatch):
     findings = validator.get_findings()
     
     # Verify the results
-    assert result is True, f"Validation should pass with secure permissions. Findings: {findings}"
-    assert len(findings) == 0, f"No findings should be reported for secure permissions. Found: {findings}"
+    error_msg = (
+        f"Validation should pass with secure permissions. "
+        f"Result: {result}, Findings: {findings}"
+    )
+    assert result is True, error_msg
+    assert len(findings) == 0, error_msg
 
 
 @pytest.mark.skipif(not HAS_DEPENDENCIES, reason="Missing required dependencies")
