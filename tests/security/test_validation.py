@@ -34,6 +34,9 @@ pytestmark = pytest.mark.skipif(
     reason="Skipping all tests due to missing dependencies"
 )
 
+# Skip network tests by default to avoid external dependencies
+SKIP_NETWORK_TESTS = os.environ.get('SKIP_NETWORK_TESTS', '1') == '1'
+
 def test_check_file_permissions_secure(tmp_path):
     """Test checking secure file permissions."""
     # Create a test file with secure permissions
