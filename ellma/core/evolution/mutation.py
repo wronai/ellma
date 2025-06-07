@@ -8,7 +8,7 @@ import random
 import ast
 import inspect
 import numpy as np
-from typing import Dict, Any, List, Tuple, Optional, Callable, TypeVar, Union, Type
+from typing import Dict, Any, List, Tuple, Optional, Callable, TypeVar, Union, Type, Generic
 from dataclasses import dataclass
 
 # Type variable for generic mutation functions

@@ -1,25 +1,140 @@
 """
-ELLMa Helper Utilities
+ELLMa Helper Utilities (Legacy)
 
-This module contains common helper functions and utilities used throughout ELLMa.
+NOTE: This module is now DEPRECATED and maintained for backward compatibility only.
+Please update your imports to use the new modular structure in ellma.utils.helpers.*
+
+Example:
+    # Old way (deprecated):
+    from ellma.utils.helpers import get_file_hash
+    
+    # New way (recommended):
+    from ellma.utils.helpers.file_utils import get_file_hash
 """
 
-import os
-import sys
-import time
-import hashlib
-import tempfile
-import subprocess
-from pathlib import Path
+import warnings
 from typing import Any, Dict, List, Optional, Union, Callable
-from datetime import datetime, timedelta
-from functools import wraps
 
-from ellma.utils.logger import get_logger
+# Issue deprecation warning
+warnings.warn(
+    "The ellma.utils.helpers module is deprecated. "
+    "Please import from specific submodules (e.g., ellma.utils.helpers.file_utils).",
+    DeprecationWarning,
+    stacklevel=2
+)
 
-logger = get_logger(__name__)
+# Re-export all functions from the new module structure
+from .helpers.file_utils import (
+    ensure_directory,
+    get_file_hash,
+    get_file_size_human,
+    create_temp_file,
+    cleanup_temp_files,
+    is_newer_than
+)
 
+from .helpers.network_utils import (
+    is_port_open,
+    wait_for_port,
+    get_free_port
+)
 
+from .helpers.decorators import (
+    timeout_decorator,
+    retry_decorator,
+    memoize_decorator,
+    debounce,
+    throttle
+)
+
+from .helpers.data_utils import (
+    deep_merge_dicts,
+    flatten_dict,
+    chunk_list,
+    snake_to_camel,
+    camel_to_snake,
+    parse_size_string
+)
+
+from .helpers.validation import (
+    validate_email,
+    validate_url,
+    validate_ip_address,
+    validate_regex,
+    validate_file_exists,
+    validate_directory,
+    validate_type
+)
+
+from .helpers.time_utils import (
+    get_timestamp,
+    parse_timestamp,
+    days_ago,
+    format_duration,
+    time_since,
+    is_weekday
+)
+
+from .helpers.concurrency import (
+    RateLimiter,
+    CircuitBreaker,
+    TaskPool
+)
+
+# Maintain the same interface for backward compatibility
+__all__ = [
+    # File utilities
+    'ensure_directory',
+    'get_file_hash',
+    'get_file_size_human',
+    'create_temp_file',
+    'cleanup_temp_files',
+    'is_newer_than',
+    
+    # Network utilities
+    'is_port_open',
+    'wait_for_port',
+    'get_free_port',
+    
+    # Decorators
+    'timeout_decorator',
+    'retry_decorator',
+    'memoize_decorator',
+    'debounce',
+    'throttle',
+    
+    # Data utilities
+    'deep_merge_dicts',
+    'flatten_dict',
+    'chunk_list',
+    'snake_to_camel',
+    'camel_to_snake',
+    'parse_size_string',
+    
+    # Validation
+    'validate_email',
+    'validate_url',
+    'validate_ip_address',
+    'validate_regex',
+    'validate_file_exists',
+    'validate_directory',
+    'validate_type',
+    
+    # Time utilities
+    'get_timestamp',
+    'parse_timestamp',
+    'days_ago',
+    'format_duration',
+    'time_since',
+    'is_weekday',
+    
+    # Concurrency
+    'RateLimiter',
+    'CircuitBreaker',
+    'TaskPool'
+]
+
+# Keep the safe_import function as it's used by other modules
 def safe_import(module_name: str, package: Optional[str] = None):
     """
     Safely import a module, returning None if import fails
@@ -31,12 +146,13 @@ def safe_import(module_name: str, package: Optional[str] = None):
     Returns:
         Imported module or None if failed
     """
+    import importlib
     try:
-        if package:
-            return __import__(module_name, fromlist=[package])
-        else:
-            return __import__(module_name)
+        return importlib.import_module(module_name, package=package)
     except ImportError:
+        import sys
+        import logging
+        logger = logging.getLogger(__name__)
         logger.debug(f"Failed to import {module_name}")
         return None
 
