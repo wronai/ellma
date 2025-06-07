@@ -158,16 +158,24 @@ class ELLMa:
 
         # Check config first
         if self.config.get("model", {}).get("path"):
-            config_path = Path(self.config["model"]["path"]).expanduser()
-            if config_path.exists():
-                return str(config_path)
+            try:
+                config_path = Path(self.config["model"]["path"]).expanduser().resolve()
+                if config_path.exists():
+                    logger.info(f"Found model in config: {config_path}")
+                    return str(config_path)
+            except Exception as e:
+                logger.warning(f"Invalid model path in config: {e}")
 
         # Check possible locations
         for path in possible_paths:
-            expanded_path = path.expanduser()
-            if expanded_path.exists():
-                logger.info(f"Found model at: {expanded_path}")
-                return str(expanded_path)
+            try:
+                expanded_path = path.expanduser().resolve()
+                if expanded_path.exists():
+                    logger.info(f"Found model at: {expanded_path}")
+                    return str(expanded_path)
+            except Exception as e:
+                logger.debug(f"Error checking path {path}: {e}")
+                continue
 
         # No model found
         self.console.print("[yellow]⚠️  No LLM model found![/yellow]")
@@ -208,8 +216,12 @@ class ELLMa:
                 task = progress.add_task("Loading LLM model...", total=None)
 
                 model_config = self.config.get("model", {})
+                
+                # Ensure model_path is a string and exists
+                model_path_str = str(self.model_path.resolve())
+                
                 self.llm = Llama(
-                    model_path=str(self.model_path),  # Convert Path to string for Llama
+                    model_path=model_path_str,
                     n_ctx=model_config.get("context_length", 4096),
                     n_threads=model_config.get("threads", os.cpu_count()),
                     verbose=self.verbose
@@ -221,6 +233,7 @@ class ELLMa:
             logger.info(f"LLM model loaded: {self.model_path}")
 
         except Exception as e:
+            logger.error(f"Error loading model {self.model_path}: {str(e)}", exc_info=True)
             raise ModelNotFoundError(f"Failed to load model: {e}")
 
     def _load_modules(self):
@@ -503,7 +516,7 @@ class ELLMa:
         return {
             'version': '0.1.6',
             'model_loaded': self.llm is not None,
-            'model_path': self.model_path,
+            'model_path': str(self.model_path) if self.model_path else None,
             'modules_count': len(self.modules),
             'commands_count': len(self.commands),
             'performance_metrics': self.performance_metrics.copy(),

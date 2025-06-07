@@ -14,38 +14,75 @@ ELLMa is a revolutionary **self-evolving AI agent** that runs locally on your ma
 - 🧬 **Self-Evolution**: Automatically generates new capabilities based on usage patterns
 - 🏠 **Local-First**: Runs entirely on your machine with complete privacy
 - 🐚 **Shell-Native**: Integrates seamlessly with your system and workflows  
-- 🛠️ **Multi-Language**: Generates code in Python, Bash, Groovy, Docker, and more
+- 🛠️ **Command Execution**: Executes commands in a structured format
 - 📦 **Modular**: Extensible architecture that grows with your needs
 
 ## ⚡ Quick Start
-install
-```bash
-bash ./scripts/install.sh
-```
+
+### Prerequisites
+- Python 3.8+
+- pip
+- Git (for development)
 
 ### Installation
+
+#### Option 1: Install from source
 ```bash
-pip install ellma --upgrade
-```
-local
-```bash
+# Clone the repository
+git clone https://github.com/wronai/ellma.git
+cd ellma
+
+# Install in development mode
 pip install -e .
+
+# Or install with all dependencies
+pip install -e ".[dev]"
+```
+
+#### Option 2: Install via pip
+```bash
+pip install ellma
 ```
 
 ### First Steps
+
+1. **Initialize ELLMa** (creates config in ~/.ellma)
+   ```bash
+   ellma init
+   ```
+
+2. **Download the model** (or let it auto-download when needed)
+   ```bash
+   ellma setup --download-model
+   ```
+
+3. **Start the interactive shell**
+   ```bash
+   ellma shell
+   ```
+
+4. **Or execute commands directly**
+   ```bash
+   # Basic system commands
+   ellma exec system.scan
+   
+   # Web interaction
+   ellma exec web.read 'https://example.com'
+   ```
+
+### Development Installation
+
+For development, you'll need additional dependencies:
+
 ```bash
-# Initialize ELLMa
-ellma init
+# Install with development dependencies
+pip install -e ".[dev]"
 
-# Download Mistral 7B model (optional - will auto-download)
-ellma setup --download-model
+# Run tests
+make test
 
-# Start interactive shell
-ellma shell
-
-# Or execute commands directly
-ellma exec "system.scan"
-ellma exec "web.read https://softrec.com"
+# Run linters
+make lint
 ```
 
 ### Your First Evolution
