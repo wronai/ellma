@@ -1,2 +1,15 @@
-# Dependencies
-# Project dependencies
+# Core dependencies
+click>=8.0.0                    # CLI framework
+pyyaml>=6.0                     # Configuration parsing
+requests>=2.28.0                # HTTP client
+rich>=13.0.0                    # Rich terminal output and formatting
+jinja2>=3.1.0                   # Template engine for code generation
+psutil>=5.9.0                   # System and process monitoring
+llama-cpp-python>=0.2.0         # Local LLM inference
+numpy>=1.21.0                   # Numerical computing
+prompt-toolkit>=3.0.0           # Interactive CLI components
+
+# Optional but recommended
+aiofiles>=23.0.0                # Async file operations
+httpx>=0.24.0                   # Modern async HTTP client
+pathlib>=1.0.1                  # Path manipulation (backport for older Python)

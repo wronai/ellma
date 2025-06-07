@@ -1,1 +1,49 @@
-# Package files
+# MANIFEST.in - ELLMa Package Manifest
+# Specifies additional files to include in the Python package
+
+# Include documentation
+include README.md
+include CHANGELOG.md
+include LICENSE
+include CONTRIBUTING.md
+
+# Include configuration files
+include requirements.txt
+include requirements-dev.txt
+recursive-include ellma/data *.yaml *.json *.txt
+
+# Include templates
+recursive-include ellma/templates *.j2 *.jinja2 *.template
+
+# Include example configurations
+recursive-include examples *.py *.yaml *.sh *.md
+
+# Include test files
+recursive-include tests *.py
+
+# Include script files
+recursive-include scripts *.py *.sh
+
+# Include documentation
+recursive-include docs *.md *.rst *.py
+
+# Exclude compiled Python files
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyd
+global-exclude __pycache__
+global-exclude *.so
+
+# Exclude development files
+global-exclude .git*
+global-exclude .tox
+global-exclude .coverage
+global-exclude .pytest_cache
+global-exclude *.egg-info
+
+# Exclude OS files
+global-exclude .DS_Store
+global-exclude Thumbs.db
+
+# Include version file
+include ellma/_version.py
