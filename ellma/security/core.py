@@ -8,9 +8,9 @@ import subprocess
 import shutil
 import venv
 import importlib
-import pkg_resources
+import importlib.metadata
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Dict, Optional, Tuple, Set, Union
 from dataclasses import dataclass
 from enum import Enum
 import logging
@@ -116,21 +116,18 @@ class EnvironmentManager:
     def _check_dependencies(self) -> List[str]:
         """Check if all required dependencies are installed."""
         try:
-            from poetry.factory import Factory
-            from poetry.utils.env import EnvManager
-            from poetry.core.pyproject.toml import PyProjectTOML
+            # Read pyproject.toml to get dependencies
+            import tomli
             
-            # Load project
-            poetry = Factory().create_poetry(self.project_root)
-            env = EnvManager(poetry).get()
+            with open(self.pyproject_path, 'rb') as f:
+                pyproject = tomli.load(f)
             
-            # Get all required packages
-            required = set()
-            for pkg in poetry.package.all_requires:
-                required.add(pkg.name.lower())
+            # Get dependencies from pyproject.toml
+            dependencies = pyproject.get('tool', {}).get('poetry', {}).get('dependencies', {})
+            required = {name.lower() for name in dependencies.keys() if name != 'python'}
             
             # Get installed packages
-            installed = {pkg.key.lower() for pkg in env.get_all_packages()}
+            installed = {dist.metadata['Name'].lower() for dist in importlib.metadata.distributions()}
             
             # Find missing
             return [pkg for pkg in required if pkg not in installed]
