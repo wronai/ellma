@@ -29,20 +29,23 @@ class DummyRecognizer:
     def recognize_sphinx(self, *args, **kwargs):
         raise ImportError("speech_recognition module not installed")
 
-# Initialize sr as None
-sr = None
+# Initialize speech recognition variables
 SPEECH_RECOGNITION_AVAILABLE = False
+sr = None
 
-# Try to import speech recognition
+# Try to import speech_recognition
 try:
-    import speech_recognition as _sr
-    sr = _sr
-    # Create a dummy AudioData class if not available
-    if not hasattr(sr, 'AudioData'):
-        sr.AudioData = DummyAudioData
-    if not hasattr(sr, 'Recognizer'):
-        sr.Recognizer = DummyRecognizer
-    SPEECH_RECOGNITION_AVAILABLE = True
+    import speech_recognition as sr
+    # Check if the module has the required attributes
+    if hasattr(sr, 'AudioData') and hasattr(sr, 'Recognizer'):
+        SPEECH_RECOGNITION_AVAILABLE = True
+    else:
+        # If the module is imported but missing required attributes
+        class DummySR:
+            AudioData = DummyAudioData
+            Recognizer = DummyRecognizer
+        sr = DummySR()
+        SPEECH_RECOGNITION_AVAILABLE = False
 except ImportError:
     # Create a dummy module-like object with the required attributes
     class DummySR:
@@ -51,7 +54,6 @@ except ImportError:
     
     sr = DummySR()
     SPEECH_RECOGNITION_AVAILABLE = False
-    sr = None  # Set sr to None if not available
 
 # Try to import whisper
 try:

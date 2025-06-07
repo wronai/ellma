@@ -336,7 +336,11 @@ def test_severity_logging(severity, expected_log_level, caplog):
     
     assert len(caplog.records) == 1
     record = caplog.records[0]
-    assert record.levelname == expected_log_level
+    # Strip ANSI color codes from the levelname for comparison
+    import re
+    ansi_escape = re.compile(r'\x1b\[[0-9;]+m')
+    clean_levelname = ansi_escape.sub('', record.levelname)
+    assert clean_levelname == expected_log_level, f"Expected {expected_log_level} but got {clean_levelname}"
     assert "Test finding" in record.message
     assert "Fix it" in record.message
 
