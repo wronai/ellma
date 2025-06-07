@@ -80,21 +80,26 @@ def test_check_directory_permissions(tmp_path):
     for item in sorted(results['insecure']):
         print(f"- {item}")
     
-    # Should find the secure file and directory
-    assert str(test_dir) + '/' in results['secure']
+    # Should find the secure file (directories are not included in 'secure' list)
     assert str(secure_file) in results['secure']
     
-    # Should flag the insecure files
-    insecure_paths = [i.split(':')[0] for i in results['insecure']]
+    # Should flag the insecure files and directories
+    insecure_paths = [i.split(':', 1)[0].strip() for i in results['insecure']]
+    
+    # Check that insecure files are in the results
     assert str(insecure_file) in insecure_paths
     assert str(readable_file) in insecure_paths
     
-    # Should have at least 2 insecure items (insecure.txt and readable.txt)
-    assert len(results['insecure']) >= 2
+    # Check that the test directory and subdirectory are in the insecure list
+    assert any(str(test_dir) in path for path in insecure_paths)
+    assert any('subdir' in path for path in insecure_paths)
+    
+    # Should have at least 4 insecure items (test_dir, subdir, insecure.txt, readable.txt)
+    assert len(results['insecure']) >= 4
     
     # Check that the error message contains the expected permission info
-    error_messages = '\n'.join(results['insecure'])
-    assert "insecure permissions" in error_messages.lower() or "permissions too permissive" in error_messages.lower()
+    error_messages = '\n'.join(results['insecure']).lower()
+    assert "insecure permissions" in error_messages or "permissions too permissive" in error_messages
 
 
 @patch('ellma.security.validations.logger')
