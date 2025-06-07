@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ellma"
-version = "0.1.15"
+version = "0.1.16"
 description = "Evolutionary Local LLM Agent - Self-improving AI assistant"
 authors = ["Tom Sapletta <info@softreck.dev>"]
 maintainers = ["WRONAI Team <contact@wronai.dev>"]
@@ -9,7 +9,7 @@ readme = "README.md"
 packages = [{include = "ellma"}]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
+python = ">=3.10,<3.14"
 click = "^8.0.0"
 pyyaml = "^6.0"
 requests = "^2.28.0"
