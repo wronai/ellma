@@ -62,6 +62,7 @@ class ELLMaLogFilter(logging.Filter):
 def setup_logging(
     level: str = "INFO",
     log_file: Optional[str] = None,
+    chat_log_file: Optional[str] = None,
     console: bool = True,
     rich_console: bool = True,
     max_size: str = "10MB",
@@ -73,7 +74,8 @@ def setup_logging(
 
     Args:
         level: Logging level
-        log_file: Path to log file
+        log_file: Path to system log file
+        chat_log_file: Path to chat history log file
         console: Enable console logging
         rich_console: Use rich console formatting
         max_size: Maximum log file size
@@ -92,58 +94,88 @@ def setup_logging(
     # Convert level string to logging level
     numeric_level = getattr(logging, level.upper(), logging.INFO)
 
-    # Configure root logger
+    # Configure root logger for system logs
     root_logger = logging.getLogger("ellma")
     root_logger.setLevel(numeric_level)
 
     # Clear existing handlers if reconfiguring
     if _configured:
-        root_logger.handlers.clear()
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
 
-    # Console handler
-    if console:
-        if rich_console:
-            console_handler = RichHandler(
-                console=Console(stderr=True),
-                show_time=True,
-                show_path=True,
-                markup=True,
-                rich_tracebacks=True
-            )
-            console_handler.setFormatter(logging.Formatter("%(message)s"))
-        else:
-            console_handler = logging.StreamHandler(sys.stderr)
-            console_handler.setFormatter(ColoredFormatter(format_string))
+    # Create formatter
+    formatter = logging.Formatter(format_string)
 
-        console_handler.setLevel(numeric_level)
-        console_handler.addFilter(ELLMaLogFilter())
-        root_logger.addHandler(console_handler)
-
-    # File handler
+    # Add file handler for system logs if log_file is specified
     if log_file:
-        log_path = Path(log_file).expanduser()
+        log_path = Path(log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Parse max_size
-        size_bytes = _parse_size(max_size)
-
+        
+        # Use RotatingFileHandler for log rotation
         file_handler = logging.handlers.RotatingFileHandler(
-            log_path,
-            maxBytes=size_bytes,
+            log_file,
+            maxBytes=_parse_size(max_size),
             backupCount=backup_count,
             encoding='utf-8'
         )
-
-        file_formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
-        )
-        file_handler.setFormatter(file_formatter)
-        file_handler.setLevel(logging.DEBUG)  # File gets all levels
+        file_handler.setFormatter(formatter)
         file_handler.addFilter(ELLMaLogFilter())
         root_logger.addHandler(file_handler)
 
+    # Add console handler if enabled
+    if console:
+        if rich_console:
+            console_handler = RichHandler(
+                show_time=False,
+                rich_tracebacks=True,
+                tracebacks_show_locals=True
+            )
+            console_handler.setFormatter(ColoredFormatter("%(message)s"))
+        else:
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(ColoredFormatter(format_string))
+        
+        console_handler.addFilter(ELLMaLogFilter())
+        root_logger.addHandler(console_handler)
+
+    # Create a separate logger for chat history
+    chat_logger = logging.getLogger("ellma.chat")
+    chat_logger.setLevel(logging.INFO)
+    
+    # Don't propagate to root logger to avoid duplicate logs
+    chat_logger.propagate = False
+    
+    # Clear existing handlers
+    for handler in chat_logger.handlers[:]:
+        chat_logger.removeHandler(handler)
+    
+    # Add file handler for chat history if specified
+    if chat_log_file:
+        chat_path = Path(chat_log_file)
+        chat_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Use RotatingFileHandler for chat history
+        chat_handler = logging.handlers.RotatingFileHandler(
+            chat_log_file,
+            maxBytes=_parse_size(max_size),
+            backupCount=backup_count,
+            encoding='utf-8'
+        )
+        chat_handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
+        chat_logger.addHandler(chat_handler)
+    
     _configured = True
     return root_logger
+
+
+def get_chat_logger() -> logging.Logger:
+    """
+    Get the chat logger instance
+    
+    Returns:
+        Configured chat logger instance
+    """
+    return logging.getLogger("ellma.chat")
 
 def get_logger(name: str) -> logging.Logger:
     """

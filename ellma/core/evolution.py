@@ -41,7 +41,7 @@ class EvolutionEngine:
 
     def __init__(self, agent):
         """
-        Initialize Evolution Engine
+        Initialize Evolution Engine with enhanced configuration
 
         Args:
             agent: ELLMa agent instance
@@ -51,56 +51,228 @@ class EvolutionEngine:
         self.evolution_log = []
         self.capabilities = set()
         self.improvement_suggestions = []
+        self.last_evolution_time = None
+        self.evolution_metrics = {
+            'total_cycles': 0,
+            'successful_cycles': 0,
+            'failed_cycles': 0,
+            'modules_created': 0,
+            'modules_removed': 0,
+            'performance_improvement': 0.0
+        }
 
-        # Evolution configuration
+        # Load and validate evolution configuration
+        self._load_configuration()
+
+        # Setup evolution environment
+        self._setup_directories()
+        self._setup_resource_limits()
+        self._load_evolution_history()
+        
+        # Initialize evolution state
+        self.current_cycle = None
+        self.is_evolving = False
+
+    def _load_configuration(self):
+        """Load and validate evolution configuration"""
         self.evolution_config = self.agent.config.get("evolution", {})
+        
+        # Core settings
         self.enabled = self.evolution_config.get("enabled", True)
         self.auto_improve = self.evolution_config.get("auto_improve", True)
-        self.learning_rate = self.evolution_config.get("learning_rate", 0.1)
+        self.evolution_interval = self.evolution_config.get("evolution_interval", 50)
+        self.max_modules = self.evolution_config.get("max_modules", 100)
+        self.backup_before_evolution = self.evolution_config.get("backup_before_evolution", True)
+        
+        # Learning parameters
+        self.learning_rate = max(0.0, min(1.0, self.evolution_config.get("learning_rate", 0.1)))
+        self.exploration_rate = max(0.0, min(1.0, self.evolution_config.get("exploration_rate", 0.2)))
+        self.max_depth = max(1, self.evolution_config.get("max_depth", 5))
+        self.max_iterations = max(1, self.evolution_config.get("max_iterations", 100))
+        self.early_stopping = self.evolution_config.get("early_stopping", True)
+        
+        # Resource management
+        self.max_memory_mb = max(256, self.evolution_config.get("max_memory_mb", 4096))
+        self.max_runtime_minutes = max(1, self.evolution_config.get("max_runtime_minutes", 30))
+        self.cpu_threads = max(0, self.evolution_config.get("cpu_threads", 0))
+        
+        # Advanced settings
+        self.enable_parallel = self.evolution_config.get("enable_parallel", True)
+        self.enable_rollback = self.evolution_config.get("enable_rollback", True)
+        self.enable_benchmark = self.evolution_config.get("enable_benchmark", True)
+        self.log_level = self.evolution_config.get("log_level", "INFO").upper()
+        
+        # Module settings
+        self.allow_new_modules = self.evolution_config.get("allow_new_modules", True)
+        self.allow_module_removal = self.evolution_config.get("allow_module_removal", False)
+        self.min_module_usage = max(0, self.evolution_config.get("min_module_usage", 5))
+        
+        # Performance targets
+        self.target_success_rate = max(0.0, min(1.0, self.evolution_config.get("target_success_rate", 0.95)))
+        self.target_execution_time = max(0.1, self.evolution_config.get("target_execution_time", 1.0))
+        self.min_improvement = max(0.0, self.evolution_config.get("min_improvement", 0.01))
+        
+        # Set logger level
+        logger.setLevel(self.log_level)
 
-        # Directories
+    def _setup_resource_limits(self):
+        """Configure system resource limits for evolution"""
+        try:
+            import resource
+            # Convert MB to bytes
+            soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+            new_soft = min(soft if soft != resource.RLIM_INFINITY else float('inf'), 
+                         self.max_memory_mb * 1024 * 1024)
+            resource.setrlimit(resource.RLIMIT_AS, (new_soft, hard))
+            logger.debug(f"Set memory limit to {self.max_memory_mb}MB")
+        except Exception as e:
+            logger.warning(f"Could not set resource limits: {e}")
+
+    def _setup_directories(self):
+        """Create and validate evolution directories"""
+        # Base directories
         self.evolution_dir = self.agent.home_dir / "evolution"
         self.generated_modules_dir = self.evolution_dir / "generated"
         self.analysis_dir = self.evolution_dir / "analysis"
-
-        # Create directories
-        self._setup_directories()
-
-        # Load evolution history
-        self._load_evolution_history()
-
-    def _setup_directories(self):
-        """Create evolution directories"""
-        for directory in [self.evolution_dir, self.generated_modules_dir, self.analysis_dir]:
-            directory.mkdir(parents=True, exist_ok=True)
+        self.backup_dir = self.evolution_dir / "backups"
+        self.temp_dir = self.evolution_dir / "temp"
+        
+        # Create all required directories
+        for directory in [self.evolution_dir, self.generated_modules_dir, 
+                         self.analysis_dir, self.backup_dir, self.temp_dir]:
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+                # Ensure directories are writable
+                if not os.access(str(directory), os.W_OK):
+                    raise PermissionError(f"Directory not writable: {directory}")
+            except Exception as e:
+                logger.error(f"Failed to create directory {directory}: {e}")
+                raise
 
     def _load_evolution_history(self):
-        """Load previous evolution cycles"""
+        """Load and validate previous evolution cycles"""
         history_file = self.evolution_dir / "evolution_history.json"
-        if history_file.exists():
-            try:
-                with open(history_file, 'r') as f:
-                    self.evolution_log = json.load(f)
-                logger.info(f"Loaded {len(self.evolution_log)} evolution cycles")
-            except Exception as e:
-                logger.warning(f"Failed to load evolution history: {e}")
+        backup_file = self.backup_dir / f"evolution_history_{int(time.time())}.json"
+        
+        if not history_file.exists():
+            logger.info("No evolution history found, starting fresh")
+            self.evolution_log = []
+            return
+            
+        try:
+            # Create backup before loading
+            if history_file.exists():
+                import shutil
+                shutil.copy2(str(history_file), str(backup_file))
+                logger.debug(f"Created backup of evolution history at {backup_file}")
+            
+            # Load history
+            with open(history_file, 'r') as f:
+                history = json.load(f)
+                
+            # Validate history structure
+            if not isinstance(history, list):
+                raise ValueError("Invalid history format: expected list")
+                
+            # Update metrics from history
+            self.evolution_metrics['total_cycles'] = len(history)
+            self.evolution_metrics['successful_cycles'] = sum(
+                1 for cycle in history if cycle.get('status') == 'success'
+            )
+            self.evolution_metrics['failed_cycles'] = self.evolution_metrics['total_cycles'] - self.evolution_metrics['successful_cycles']
+            
+            self.evolution_log = history
+            logger.info(f"Loaded {len(self.evolution_log)} evolution cycles ({self.evolution_metrics['successful_cycles']} successful)")
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse evolution history: {e}")
+            self.evolution_log = []
+        except Exception as e:
+            logger.error(f"Failed to load evolution history: {e}")
+            self.evolution_log = []
 
-    def evolve(self) -> Dict:
+    def evolve(self, force: bool = False) -> Dict:
         """
-        Main evolution process
+        Main evolution process with enhanced capabilities
+
+        Args:
+            force: If True, force evolution even if conditions aren't optimal
 
         Returns:
-            Evolution results dictionary
+            Evolution results dictionary with detailed metrics
         """
-        if not self.enabled:
-            self.console.print("[yellow]Evolution is disabled in configuration[/yellow]")
-            return {"status": "disabled"}
+        if not self.enabled and not force:
+            msg = "[yellow]Evolution is disabled in configuration[/yellow]"
+            self.console.print(msg)
+            logger.warning("Evolution attempted but disabled in config")
+            return {"status": "disabled", "message": msg}
 
-        self.console.print(Panel(
-            "[bold cyan]🧬 ELLMa Evolution Cycle Starting[/bold cyan]",
-            title="Self-Improvement",
-            border_style="cyan"
-        ))
+        if self.is_evolving:
+            msg = "[yellow]Evolution already in progress[/yellow]"
+            self.console.print(msg)
+            logger.warning("Evolution already in progress")
+            return {"status": "busy", "message": msg}
+            
+        self.is_evolving = True
+        self.current_cycle = {
+            'start_time': time.time(),
+            'status': 'started',
+            'metrics': {},
+            'changes': {}
+        }
+
+        try:
+            # Check system resources
+            if not self._check_system_resources() and not force:
+                msg = "[yellow]Insufficient system resources for evolution[/yellow]"
+                self.console.print(msg)
+                return {"status": "resource_constrained", "message": msg}
+
+            self.console.print(Panel(
+                "[bold cyan]🧬 ELLMa Evolution Cycle Starting[/bold cyan]",
+                title="Self-Improvement",
+                subtitle=f"Cycle #{self.evolution_metrics['total_cycles'] + 1}",
+                border_style="cyan"
+            ))
+
+        except Exception as e:
+            error_msg = f"Failed to start evolution cycle: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            self.is_evolving = False
+            return {"status": "error", "message": error_msg}
+
+    def _check_system_resources(self) -> bool:
+        """
+        Check if system has sufficient resources for evolution
+        
+        Returns:
+            bool: True if system has sufficient resources, False otherwise
+        """
+        try:
+            import psutil
+            import shutil
+            
+            # Check available memory
+            mem = psutil.virtual_memory()
+            min_memory_mb = 1024  # 1GB minimum
+            if mem.available < (min_memory_mb * 1024 * 1024):
+                logger.warning(f"Insufficient memory: {mem.available/(1024*1024):.1f}MB available, "
+                             f"{min_memory_mb}MB required")
+                return False
+            
+            # Check disk space
+            min_disk_space = 2 * 1024 * 1024 * 1024  # 2GB
+            _, _, free = shutil.disk_usage("/")
+            if free < min_disk_space:
+                logger.warning(f"Insufficient disk space: {free/(1024*1024):.1f}MB available, "
+                             f"{min_disk_space/(1024*1024):.1f}MB required")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error checking system resources: {e}")
+            return False
 
         evolution_start = time.time()
         evolution_id = f"evolution_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -186,20 +358,64 @@ class EvolutionEngine:
         return analysis
 
     def _analyze_performance(self) -> Dict:
-        """Analyze performance metrics"""
+        """
+        Analyze performance metrics with enhanced statistics
+        
+        Returns:
+            Dict containing comprehensive performance analysis
+        """
         metrics = self.agent.performance_metrics
-
-        total_executions = metrics['successful_executions'] + metrics['failed_executions']
-        success_rate = metrics['successful_executions'] / max(total_executions, 1)
-        avg_execution_time = metrics['total_execution_time'] / max(total_executions, 1)
-
+        
+        # Basic metrics
+        total_executions = metrics.get('successful_executions', 0) + metrics.get('failed_executions', 0)
+        success_rate = metrics.get('successful_executions', 0) / max(total_executions, 1)
+        avg_execution_time = metrics.get('total_execution_time', 0) / max(total_executions, 1)
+        
+        # Command success rates
+        command_stats = {}
+        for cmd, stats in metrics.get('command_stats', {}).items():
+            cmd_total = stats.get('success', 0) + stats.get('fail', 0)
+            if cmd_total > 0:
+                command_stats[cmd] = {
+                    'success_rate': stats.get('success', 0) / cmd_total,
+                    'avg_time': stats.get('total_time', 0) / cmd_total,
+                    'total': cmd_total
+                }
+        
+        # Identify problematic commands
+        problematic_commands = [
+            cmd for cmd, stats in command_stats.items()
+            if stats['success_rate'] < 0.8 or stats['avg_time'] > 5.0
+        ]
+        
+        # Resource usage
+        resource_usage = {
+            'memory_mb': metrics.get('peak_memory_usage_mb', 0),
+            'cpu_percent': metrics.get('peak_cpu_percent', 0),
+            'io_operations': metrics.get('io_operations', 0)
+        }
+        
+        # Performance score (0-1, higher is better)
+        perf_score = min(1.0, success_rate * (1 / max(avg_execution_time, 0.01)))
+        
         return {
-            "total_commands": metrics['commands_executed'],
-            "success_rate": success_rate,
-            "failure_rate": 1 - success_rate,
-            "average_execution_time": avg_execution_time,
-            "total_execution_time": metrics['total_execution_time'],
-            "performance_score": success_rate * (1 / max(avg_execution_time, 0.01))
+            # Basic metrics
+            'total_commands': metrics.get('commands_executed', 0),
+            'success_rate': success_rate,
+            'failure_rate': 1 - success_rate,
+            'average_execution_time': avg_execution_time,
+            'total_execution_time': metrics.get('total_execution_time', 0),
+            'performance_score': perf_score,
+            
+            # Detailed statistics
+            'command_stats': command_stats,
+            'problematic_commands': problematic_commands,
+            'resource_usage': resource_usage,
+            'timestamps': {
+                'first_command': metrics.get('first_command_time'),
+                'last_command': metrics.get('last_command_time'),
+                'uptime_seconds': time.time() - (metrics.get('start_time', time.time()))
+            }
         }
 
     def _assess_capabilities(self) -> Dict:
@@ -256,97 +472,130 @@ class EvolutionEngine:
         return custom_count
 
     def _identify_opportunities(self, analysis: Dict) -> List[Dict]:
-        """Identify improvement opportunities based on analysis"""
+        """
+        Identify improvement opportunities with enhanced analysis
+        
+        Args:
+            analysis: Performance analysis results
+            
+        Returns:
+            List of improvement opportunities with priority and context
+        """
         opportunities = []
-
-        # Performance-based opportunities
-        performance = analysis['performance_analysis']
-        if performance['failure_rate'] > 0.1:
+        now = time.time()
+        
+        # 1. Performance-based opportunities
+        perf = analysis.get('performance_analysis', {})
+        
+        # High failure rate
+        if perf.get('failure_rate', 0) > 0.1:
             opportunities.append({
+                'id': f"perf_failure_{int(now)}",
                 'type': 'performance',
+                'category': 'reliability',
                 'priority': 'high',
-                'description': 'High failure rate detected - need error handling improvements',
-                'metrics': {'failure_rate': performance['failure_rate']},
-                'suggested_action': 'improve_error_handling'
+                'description': f'High command failure rate ({perf["failure_rate"]*100:.1f}%)',
+                'metrics': {'failure_rate': perf['failure_rate']},
+                'suggested_actions': [
+                    'improve_error_handling',
+                    'add_retry_mechanism',
+                    'enhance_validation'
+                ],
+                'impact': 'high',
+                'effort': 'medium',
+                'created_at': now
             })
-
-        if performance['average_execution_time'] > 5.0:
-            opportunities.append({
-                'type': 'performance',
-                'priority': 'medium',
-                'description': 'Slow execution times - need optimization',
-                'metrics': {'avg_time': performance['average_execution_time']},
-                'suggested_action': 'optimize_execution'
-            })
-
-        # Capability-based opportunities
-        capabilities = analysis['capability_assessment']
-        if capabilities['modules_count'] < 5:
-            opportunities.append({
-                'type': 'capability',
-                'priority': 'medium',
-                'description': 'Limited modules available - expand functionality',
-                'metrics': {'modules_count': capabilities['modules_count']},
-                'suggested_action': 'create_new_modules'
-            })
-
-        # Failure pattern opportunities
-        failures = analysis['failure_patterns']
-        for command, pattern in failures:
-            if pattern['count'] > 3:
+        
+        # 2. Capability gaps
+        for cmd in perf.get('problematic_commands', []):
+            if cmd not in getattr(self.agent, 'command_registry', {}):
                 opportunities.append({
-                    'type': 'reliability',
+                    'id': f"cap_missing_{cmd}_{int(now)}",
+                    'type': 'capability',
+                    'category': 'missing_feature',
                     'priority': 'high',
-                    'description': f'Frequent failures in {command} command',
-                    'metrics': {'failure_count': pattern['count']},
-                    'suggested_action': f'fix_{command}_command'
+                    'description': f'Missing command: {cmd}',
+                    'suggested_actions': [f'add_{cmd}_command'],
+                    'impact': 'high',
+                    'effort': 'medium',
+                    'created_at': now
                 })
-
-        # LLM-based opportunity identification
-        if self.agent.llm:
-            llm_opportunities = self._llm_identify_opportunities(analysis)
-            opportunities.extend(llm_opportunities)
-
+        
+        # 3. Resource optimization
+        res = analysis.get('resource_usage', {})
+        if res.get('memory_usage', 0) > 80:  # If memory usage > 80%
+            opportunities.append({
+                'id': f"res_memory_{int(now)}",
+                'type': 'resource',
+                'category': 'memory',
+                'priority': 'high',
+                'description': f'High memory usage: {res["memory_usage"]:.1f}%',
+                'metrics': {'memory_percent': res['memory_usage']},
+                'suggested_actions': [
+                    'optimize_memory_usage',
+                    'add_memory_limits',
+                    'implement_garbage_collection'
+                ],
+                'impact': 'high',
+                'effort': 'high',
+                'created_at': now
+            })
+        
+        # 4. LLM-based opportunity identification
+        if hasattr(self.agent, 'llm') and self.agent.llm is not None:
+            try:
+                llm_opportunities = self._llm_identify_opportunities(analysis)
+                opportunities.extend(llm_opportunities)
+            except Exception as e:
+                logger.error(f"LLM opportunity identification failed: {e}")
+        
+        # Sort opportunities by priority (high to low) and creation time (newest first)
+        priority_order = {'high': 0, 'medium': 1, 'low': 2}
+        opportunities.sort(key=lambda x: (priority_order.get(x.get('priority', 'low'), 2), 
+                                        -x.get('created_at', 0)))
+        
         return opportunities
-
+        
     def _llm_identify_opportunities(self, analysis: Dict) -> List[Dict]:
-        """Use LLM to identify additional opportunities"""
+        """Use LLM to identify additional improvement opportunities"""
+        if not hasattr(self.agent, 'generate'):
+            return []
+            
         prompt = f"""
-        Analyze this ELLMa agent performance data and identify 3 specific improvement opportunities:
-
+        Analyze this ELLMa agent performance data and suggest improvement opportunities:
+        
         Performance Metrics:
         - Success Rate: {analysis['performance_analysis']['success_rate']:.2%}
         - Average Execution Time: {analysis['performance_analysis']['average_execution_time']:.2f}s
         - Available Modules: {analysis['capability_assessment']['available_modules']}
-
-        Recent Task History: {len(self.agent.task_history)} tasks
-
+        
         Focus on:
-        1. Missing essential functionality that users might need
-        2. Performance bottlenecks that could be optimized
+        1. Missing essential functionality
+        2. Performance bottlenecks
         3. New capabilities that would make the agent more useful
-
-        Return JSON array of opportunities:
+        
+        Return a JSON array of opportunities with this structure:
         [
           {{
             "type": "capability|performance|reliability",
-            "priority": "high|medium|low", 
-            "description": "Clear description of the opportunity",
-            "suggested_action": "specific_action_to_take"
+            "priority": "high|medium|low",
+            "description": "Clear description",
+            "suggested_actions": ["action1", "action2"]
           }}
         ]
         """
-
+        
         try:
             response = self.agent.generate(prompt, max_tokens=500)
-            # Try to parse JSON response
+            # Extract JSON from response
             import re
             json_match = re.search(r'\[.*\]', response, re.DOTALL)
             if json_match:
-                opportunities = json.loads(json_match.group())
-                return opportunities
+                return json.loads(json_match.group())
         except Exception as e:
             logger.warning(f"LLM opportunity identification failed: {e}")
+            
+        return []
 
         return []
 

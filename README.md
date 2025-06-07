@@ -102,13 +102,7 @@ pip install ellma
    # ellma download-model --model mistral-7b-instruct
    ```
 
-3. **Verify your setup**
-   ```bash
-   # Check system requirements and configuration
-   ellma verify
-   ```
-
-4. **Start the interactive shell**
+3. **Start the interactive shell**
    ```bash
    # Start interactive shell
    ellma shell
@@ -120,13 +114,13 @@ pip install ellma
 5. **Or execute commands directly**
    ```bash
    # System information
-   ellma exec system.scan
+   ellma exec system scan
    
    # Web interaction (extract text and links)
-   ellma exec web.read https://example.com --extract-text --extract-links
+   ellma exec web read https://example.com --extract-text --extract-links
    
    # File operations (search for Python files)
-   ellma exec files.search /path/to/directory --pattern "*.py"
+   ellma exec files search /path/to/directory --pattern "*.py"
    
    # Get agent status
    ellma status
@@ -232,41 +226,110 @@ ELLMa's evolution engine allows it to analyze its performance and automatically 
 # Run a single evolution cycle
 ellma evolve
 
-# Run multiple evolution cycles
+# Run multiple evolution cycles (up to 3 recommended)
 ellma evolve --cycles 3
 
-# Force evolution even if no improvements are detected
+# Force evolution even if not enough commands have been executed
 ellma evolve --force
-
-# Run evolution with specific parameters
-ellma evolve --learning-rate 0.2 --max-depth 5
 ```
+
+### Evolution Requirements
+- At least 10 commands should be executed before evolution is recommended
+- Use `--force` to bypass this requirement
+- Evolution status is shown in the main status output
 
 ### Monitoring Evolution
 
 ```bash
-# View evolution history
+# View evolution history (if available)
 cat ~/.ellma/evolution/evolution_history.json | jq .
 
 # Monitor evolution logs
 tail -f ~/.ellma/logs/evolution.log
 
-# Get evolution status
-ellma status --evolution
+# Check evolution status in the main status output
+ellma status
 ```
 
-### Evolution Configuration
+### 🧬 Evolution Configuration
 
-You can configure the evolution process in `~/.ellma/config.yaml`:
+Customize the self-improvement process in `~/.ellma/config.yaml`:
 
 ```yaml
 evolution:
-  enabled: true
-  auto_improve: true
-  learning_rate: 0.1
-  max_depth: 3
-  max_iterations: 100
-  early_stopping: true
+  enabled: true               # Enable/disable evolution
+  auto_improve: true         # Allow automatic improvements
+  learning_rate: 0.1         # Learning rate for evolution (0.0-1.0)
+```
+
+### Status Information
+
+The main status command shows key evolution metrics:
+```bash
+ellma status
+```
+
+Example output:
+```
+🤖 ELLMa Status                        
+┏━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Property               ┃ Value                                   ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Version                │ 0.1.6                                   │
+│ Model Loaded           │ ✅ Yes                                  │
+│ Model Path             │ /path/to/model.gguf                     │
+│ Modules                │ 0                                       │
+│ Commands               │ 3                                       │
+│ Commands Executed      │ 15                                      │
+│ Success Rate           │ 100.0%                                  │
+│ Evolution Cycles       │ 0                                       │
+│ Modules Created        │ 0                                       │
+└────────────────────────┴─────────────────────────────────────────┘
+```
+```
+
+### Monitoring Evolution
+
+Track evolution progress and results:
+
+```bash
+# View evolution history with detailed metrics
+ellma evolution history --limit 10
+
+# Monitor evolution in real-time
+ellma evolution monitor
+
+# Get evolution statistics
+ellma evolution stats
+
+# Compare evolution cycles
+ellma evolution compare cycle1 cycle2
+```
+
+### Evolution Best Practices
+
+1. **Start Conservative**: Begin with lower learning rates and enable auto-improve
+2. **Monitor Progress**: Regularly check evolution logs and metrics
+3. **Set Resource Limits**: Prevent excessive resource usage
+4. **Use Benchmarks**: Enable benchmarking to measure improvements
+5. **Review Changes**: Periodically review and test evolved modules
+
+### Troubleshooting Evolution
+
+Common issues and solutions:
+
+```bash
+# If evolution gets stuck
+ellma evolution cancel
+
+# Reset to last known good state
+ellma evolution rollback
+
+# Clear evolution cache
+ellma evolution clean
+
+# Force reset evolution state (use with caution)
+ellma evolution reset --confirm
 ```
 
 ## 🧩 Extending ELLMa
@@ -399,25 +462,49 @@ ellma exec system.health
 ### 🔍 Advanced Command Usage
 
 ```bash
-# Chain multiple commands
-ellma exec "system.scan && web.read https://example.com"
+# Run system scan
+ellma exec system.scan
+
+# Read web page content
+ellma exec web.read https://example.com
+
+# Read web page with link extraction
+ellma exec "web.read('https://example.com', extract_links=True)"
+
+# Quick system health check
+ellma exec system.health
 
 # Save command output to file
 ellma exec system.scan > scan_results.json
-
-# Use different output formats
-ellma exec system.scan --format json
-ellma exec system.scan --format yaml
 ```
 
-### 🐚 Powerful Shell Interface
-Natural language commands that translate to system operations:
+### 🐚 Interactive Shell Interface
+
+Start the interactive shell and use system commands:
 
 ```bash
-ellma> system scan network ports
-ellma> generate bash script for backup
-ellma> analyze this log file for errors
-ellma> create docker setup for web app
+# Start the interactive shell
+ellma shell
+
+# In the shell, you can run commands like:
+ellma> system.health
+ellma> system.scan
+ellma> web.read https://example.com
+```
+
+Example shell session:
+```
+🤖 ELLMa Interactive Shell (v0.1.6)
+Type 'help' for available commands, 'exit' to quit
+
+ellma> system.health
+{'status': 'HEALTHY', 'cpu_usage': 12.5, 'memory_usage': 45.2, ...}
+
+ellma> web.read https://example.com
+{'status': 200, 'title': 'Example Domain', 'content_length': 1256, ...}
+
+# For commands with parameters, use space-separated arguments
+ellma> web.read https://example.com extract_links=True
 ```
 
 ### 🛠️ Multi-Language Code Generation
@@ -503,6 +590,7 @@ ellma generate docker --task "Python app with PostgreSQL and Redis"
 ellma generate test --file app/main.py --framework pytest
 
 # Document a Python function
+ellma exec code document_function utils.py --function process_data
 ```
 
 ### Generated Utilities Examples
@@ -525,8 +613,7 @@ python example_name.py
 ```
 
 For more details, see the [generated utilities documentation](docs/generated_utilities.md).
-ellma exec code.document_function utils.py --function process_data
-```
+
 
 ### Web & API Interaction
 

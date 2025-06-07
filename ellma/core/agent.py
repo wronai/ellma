@@ -127,6 +127,13 @@ class ELLMa:
                 'models': str(self.models_dir),
                 'modules': str(self.modules_dir),
                 'logs': str(self.logs_dir)
+            },
+            'logging': {
+                'level': 'INFO',
+                'system_log': str(self.logs_dir / 'system.log'),
+                'chat_log': str(self.logs_dir / 'chat.log'),
+                'max_size': '10MB',
+                'backup_count': 5
             }
         }
         
@@ -146,6 +153,27 @@ class ELLMa:
         """Create necessary directories"""
         for directory in [self.home_dir, self.models_dir, self.modules_dir, self.logs_dir]:
             directory.mkdir(parents=True, exist_ok=True)
+    
+    def _setup_logging(self):
+        """Configure logging for the agent"""
+        from ellma.utils.logger import setup_logging
+        
+        # Get logging configuration
+        log_config = self.config.get('logging', {})
+        
+        # Setup logging with both system and chat logs
+        setup_logging(
+            level=log_config.get('level', 'INFO'),
+            log_file=log_config.get('system_log'),
+            chat_log_file=log_config.get('chat_log'),
+            max_size=log_config.get('max_size', '10MB'),
+            backup_count=log_config.get('backup_count', 5),
+            console=True,
+            rich_console=True
+        )
+        
+        # Log configuration details
+        logger.debug("Logging configured with settings: %s", log_config)
 
     def _find_model(self) -> Optional[str]:
         """Find available LLM model"""
@@ -184,12 +212,16 @@ class ELLMa:
 
     def _initialize(self):
         """Initialize the agent components"""
+        # Setup logging first
+        self._setup_logging()
+        
         logger.info("Initializing ELLMa agent...")
 
         # Load LLM model
         if self.model_path and HAS_LLAMA_CPP:
             self._load_model()
         elif not HAS_LLAMA_CPP:
+            logger.error("llama-cpp-python not installed!")
             self.console.print("[red]llama-cpp-python not installed![/red]")
             self.console.print("Install with: pip install llama-cpp-python")
 
@@ -199,6 +231,8 @@ class ELLMa:
 
         # Initialize performance tracking
         self._init_performance_tracking()
+        
+        logger.info("ELLMa agent initialization complete")
 
         logger.info("ELLMa agent initialized successfully")
 

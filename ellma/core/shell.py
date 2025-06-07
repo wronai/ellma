@@ -26,9 +26,10 @@ from rich.syntax import Syntax
 from rich.markdown import Markdown
 
 from ellma.constants import BANNER
-from ellma.utils.logger import get_logger
+from ellma.utils.logger import get_logger, get_chat_logger
 
 logger = get_logger(__name__)
+chat_logger = get_chat_logger()
 
 
 class ELLMaCompleter(Completer):
@@ -261,14 +262,43 @@ class InteractiveShell:
             self.console.print(str(result))
 
     def _log_result(self, command: str, result: Any, success: bool):
-        """Log command result"""
+        """
+        Log command result to both session history and chat log
+        
+        Args:
+            command: The command that was executed
+            result: The result of the command
+            success: Whether the command executed successfully
+        """
+        timestamp = datetime.now().isoformat()
+        result_str = str(result)[:500]  # Truncate long results
+        
+        # Log to session history
         self.session_history.append({
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': timestamp,
             'command': command,
-            'result': str(result)[:500],  # Truncate long results
+            'result': result_str,
             'success': success,
             'type': 'result'
         })
+        
+        # Log to chat history
+        try:
+            # Log the command
+            chat_logger.info(f"User: {command}")
+            
+            # Log the result (if any)
+            if result is not None and str(result).strip():
+                # For multi-line results, add proper indentation
+                formatted_result = '\n'.join(f"    {line}" for line in str(result).split('\n') if line.strip())
+                chat_logger.info(f"ELLMa: {formatted_result}" if formatted_result else "")
+            
+            # Log errors if the command failed
+            if not success:
+                chat_logger.error(f"Command failed: {result_str}")
+                
+        except Exception as e:
+            logger.error(f"Failed to log to chat history: {e}")
 
     # Built-in Commands
 

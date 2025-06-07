@@ -14,23 +14,31 @@ from .search_ops import FileSearchOperations
 from .file_ops import FileManagementOperations
 
 
-class FileCommands(FileOperationsMixin, FileReadWrite, FileSearchOperations, FileManagementOperations):
+class FileCommands(FileReadWrite, FileSearchOperations, FileManagementOperations):
     """
     Unified interface for all file operations.
     
     This class combines functionality from multiple mixins to provide
     a comprehensive set of file operations while maintaining a clean
     and organized codebase.
+    
+    The inheritance order is important for method resolution:
+    1. FileReadWrite
+    2. FileSearchOperations
+    3. FileManagementOperations
     """
     
     def __init__(self, agent):
-        """Initialize the file commands with an agent reference."""
-        # Initialize all parent classes
-        FileOperationsMixin.__init__(self)
-        FileReadWrite.__init__(self, agent)
-        FileSearchOperations.__init__(self, agent)
-        FileManagementOperations.__init__(self, agent)
+        """Initialize the file commands with an agent reference.
         
+        Args:
+            agent: The agent instance that owns these commands
+        """
+        # Initialize all parent classes using super()
+        # This follows the Method Resolution Order (MRO) to call all parent initializers
+        super().__init__(agent)
+        
+        # Set instance attributes
         self.agent = agent
         self.name = "files"
         self.description = "File and directory operations"
