@@ -88,8 +88,9 @@ class SecurityValidator:
             stat_info = path.stat()
             mode = stat.S_IMODE(stat_info.st_mode)
             
-            # Check permissions
-            if mode != (mode & max_permissions):
+            # Check for any extra permissions beyond what's allowed
+            extra_perms = mode & ~max_permissions
+            if extra_perms != 0:
                 self._add_finding(
                     check_name="insecure_file_permissions",
                     severity=SecurityCheckSeverity.HIGH,
@@ -97,6 +98,7 @@ class SecurityValidator:
                     details={
                         "path": str(path),
                         "current_permissions": oct(mode),
+                        "extra_permissions": oct(extra_perms),
                         "max_allowed_permissions": oct(max_permissions)
                     },
                     remediation=f"Restrict file permissions using: chmod {oct(max_permissions)[-3:]} {path}"
@@ -159,7 +161,9 @@ class SecurityValidator:
             stat_info = path.stat()
             mode = stat.S_IMODE(stat_info.st_mode)
             
-            if mode != (mode & max_permissions):
+            # Check for any extra permissions beyond what's allowed
+            extra_perms = mode & ~max_permissions
+            if extra_perms != 0:
                 self._add_finding(
                     check_name="insecure_directory_permissions",
                     severity=SecurityCheckSeverity.HIGH,
@@ -167,6 +171,7 @@ class SecurityValidator:
                     details={
                         "path": str(path),
                         "current_permissions": oct(mode),
+                        "extra_permissions": oct(extra_perms),
                         "max_allowed_permissions": oct(max_permissions)
                     },
                     remediation=f"Restrict directory permissions using: chmod {oct(max_permissions)[-3:]} {path}"

@@ -128,9 +128,14 @@ def test_check_network_access_unauthorized():
 @pytest.mark.skipif(not HAS_DEPENDENCIES, reason="Missing required dependencies")
 def test_validate_environment(tmp_path):
     """Test the full environment validation."""
-    # Create a test project structure
-    (tmp_path / "pyproject.toml").touch()
-    (tmp_path / "poetry.lock").touch()
+    # Create a test project structure with secure permissions
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.touch()
+    pyproject.chmod(0o600)
+    
+    poetry_lock = tmp_path / "poetry.lock"
+    poetry_lock.touch()
+    poetry_lock.chmod(0o600)
     
     # Create a test .env file with secure permissions
     env_file = tmp_path / ".env"
@@ -143,12 +148,57 @@ def test_validate_environment(tmp_path):
     config_file.chmod(0o600)
     
     # Create a test directory with secure permissions
-    (tmp_path / "src").mkdir()
-    (tmp_path / "src").chmod(0o750)
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    src_dir.chmod(0o750)
+    
+    # Debug: Print file permissions
+    print("\n=== File Permissions After Creation ===")
+    for f in [pyproject, poetry_lock, env_file, config_file]:
+        try:
+            mode = f.stat().st_mode
+            print(f"{f.name}: {oct(mode & 0o777)} (owner: {f.owner()}, group: {f.group()})")
+        except Exception as e:
+            print(f"Error checking {f}: {e}")
+    
+    # Debug: Print directory permissions
+    try:
+        mode = src_dir.stat().st_mode
+        print(f"{src_dir.name}/: {oct(mode & 0o777)} (owner: {src_dir.owner()}, group: {src_dir.group()})")
+    except Exception as e:
+        print(f"Error checking {src_dir}: {e}")
+    
+    # Print debug info
+    print("\n=== Test Environment ===")
+    print(f"Test directory: {tmp_path}")
+    print("\nFile permissions:")
+    for f in tmp_path.glob('*'):
+        print(f"- {f.name}: {oct(f.stat().st_mode & 0o777)}")
+    print(f"- src/: {oct(src_dir.stat().st_mode & 0o777)}")
     
     validator = SecurityValidator(project_root=tmp_path)
-    assert validator.validate_environment() is True
-    assert len(validator.get_findings()) == 0
+    
+    # Run validation and capture results
+    result = validator.validate_environment()
+    findings = validator.get_findings()
+    
+    # Print findings if validation failed
+    if not result or findings:
+        print("\n=== Validation Failed ===")
+        print(f"Result: {result}")
+        print(f"Number of findings: {len(findings)}")
+        for i, finding in enumerate(findings, 1):
+            print(f"\nFinding {i}:")
+            print(f"- Check: {finding.check_name}")
+            print(f"- Severity: {finding.severity}")
+            print(f"- Description: {finding.description}")
+            if hasattr(finding, 'details'):
+                print("- Details:", finding.details)
+            if hasattr(finding, 'remediation'):
+                print("- Remediation:", finding.remediation)
+    
+    assert result is True
+    assert len(findings) == 0
 
 
 @pytest.mark.skipif(not HAS_DEPENDENCIES, reason="Missing required dependencies")
