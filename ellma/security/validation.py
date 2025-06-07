@@ -12,12 +12,24 @@ import stat
 import socket
 import logging
 import platform
+import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple, Union
-from dataclasses import dataclass
+from typing import Dict, List, Optional, Set, Tuple, Union, Any, Type, TypeVar
+from dataclasses import dataclass, field
 from enum import Enum
 
+# Suppress pkg_resources deprecation warning
+warnings.filterwarnings(
+    action='ignore',
+    category=DeprecationWarning,
+    message='pkg_resources is deprecated.*',
+    module='pkg_resources.*'
+)
+
 logger = logging.getLogger(__name__)
+
+# Type variable for generics
+T = TypeVar('T')
 
 class SecurityCheckSeverity(Enum):
     """Severity levels for security findings."""
