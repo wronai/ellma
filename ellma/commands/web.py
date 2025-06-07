@@ -188,29 +188,52 @@ class WebCommands(BaseCommand):
                 'timestamp': datetime.now().isoformat()
             }
 
-    @validate_args(str, bool, bool)
     @log_execution
-    def read(self, url: str, extract_text: bool = True, extract_links: bool = False) -> Dict[str, Any]:
+    def read(self, *args, **kwargs) -> Dict[str, Any]:
         """
         Read and extract content from a web page
 
+        Usage:
+            web.read example.com
+            web.read example.com extract_links true
+            web.read https://example.com extract_text true extract_links true
+
         Args:
-            url (str): Target URL to read from (supports both full URLs and domain-only inputs)
-            extract_text (bool, optional): Whether to extract clean text content. Defaults to True.
-            extract_links (bool, optional): Whether to extract all links. Defaults to False.
+            args: Positional arguments where the first is the URL
+            kwargs: Additional parameters (extract_text, extract_links)
 
         Returns:
-            Dict[str, Any]: Dictionary containing extracted content and metadata with the following structure:
-                - url (str): The requested URL
-                - title (str): Page title if available
-                - text (str): Extracted text content (if extract_text=True)
-                - links (list): List of extracted links (if extract_links=True)
-                - images (list): List of image URLs found on the page
-                - metadata (dict): Page metadata (title, description, etc.)
-                - word_count (int): Number of words in extracted text
-                - language (str): Detected language of the page
-                - timestamp (str): ISO format timestamp of when the page was read
+            Dict[str, Any]: Dictionary containing extracted content and metadata
         """
+        # Parse arguments
+        url = None
+        extract_text = True
+        extract_links = False
+
+        # First argument is the URL
+        if args and isinstance(args[0], str):
+            url = args[0]
+        elif 'url' in kwargs:
+            url = kwargs['url']
+        
+        if not url:
+            raise ValueError("URL is required as the first argument")
+
+        # Parse boolean flags from kwargs or remaining args
+        if 'extract_text' in kwargs:
+            extract_text = self._parse_bool(kwargs['extract_text'])
+        elif 'extract_text' in [a.lower() for a in args[1:]]:
+            idx = [a.lower() for a in args].index('extract_text') + 1
+            if idx < len(args):
+                extract_text = self._parse_bool(args[idx])
+
+        if 'extract_links' in kwargs:
+            extract_links = self._parse_bool(kwargs['extract_links'])
+        elif 'extract_links' in [a.lower() for a in args[1:]]:
+            idx = [a.lower() for a in args].index('extract_links') + 1
+            if idx < len(args):
+                extract_links = self._parse_bool(args[idx])
+
         # Add https:// if no scheme is provided
         original_url = url
         scheme_added = False
@@ -501,6 +524,14 @@ class WebCommands(BaseCommand):
         return changes
 
     # Helper methods
+
+    def _parse_bool(self, value) -> bool:
+        """Parse boolean values from various string representations"""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ('true', 'yes', '1', 'on', 't')
+        return bool(value)
 
     def _extract_text_simple(self, html: str) -> str:
         """Simple text extraction without BeautifulSoup"""

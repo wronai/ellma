@@ -182,22 +182,55 @@ class InteractiveShell:
         self.console.print("\n[green]Goodbye![/green]")
 
     def _process_command(self, user_input: str):
-        """Process user command"""
+        """Process user command with simplified syntax
+        
+        Supports both simple commands and structured commands with parameters:
+        - Simple: command
+        - With params: command param1 value1 param2 value2
+        - Module actions: module.action param1 value1
+        """
         try:
+            # Skip empty input
+            if not user_input.strip():
+                return
+
             # Split command and arguments
             parts = user_input.split()
             command = parts[0] if parts else ""
-            args = parts[1:] if len(parts) > 1 else []
-
-            # Check for built-in commands first
-            if command in self.builtin_commands:
-                result = self.builtin_commands[command](args)
+            
+            # Check for built-in commands first (no dot)
+            if command in self.builtin_commands and '.' not in command:
+                result = self.builtin_commands[command](parts[1:])
                 self._log_result(user_input, result, True)
                 return
 
+            # Parse command and parameters
+            params = {}
+            i = 1
+            while i < len(parts):
+                # If next part starts with '--', it's a flag
+                if parts[i].startswith('--'):
+                    param = parts[i][2:]
+                    # Check if next part is a value (not another param)
+                    if i + 1 < len(parts) and not parts[i + 1].startswith('--'):
+                        params[param] = parts[i + 1]
+                        i += 2
+                    else:
+                        # Boolean flag
+                        params[param] = True
+                        i += 1
+                else:
+                    # Positional argument (e.g., URL)
+                    if 'url' not in params and ('http://' in parts[i] or 'https://' in parts[i] or '.' in parts[i]):
+                        params['url'] = parts[i]
+                    i += 1
+
             # Check for structured commands (module.action)
             if '.' in command:
-                result = self.agent.execute(user_input)
+                # Convert params to string representation for the agent
+                param_str = ' '.join([f"{k}={v}" for k, v in params.items()])
+                full_command = f"{command} {param_str}".strip()
+                result = self.agent.execute(full_command)
                 self._display_result(result)
                 self._log_result(user_input, result, True)
                 return
