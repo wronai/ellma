@@ -1,4 +1,28 @@
+
 # TODO - ELLMa Improvement Plan
+
+**Task Group: Code Generation Workflow**
+
+1. **Do next task from TODO list.**
+
+   * Generate code as described.
+   * Run tests.
+
+2. **If tests fail:**
+
+   * Fix the code until all tests pass.
+   * Then return to step 1.
+
+3. **If there is a system/environment issue (e.g. missing dependency, config error):**
+
+   * Create a new TODO task describing the issue.
+   * Add it to the top of the TODO list.
+   * Then return to step 1 to process it.
+
+🔄 **Repeat without asking questions.**
+Always continue to the next logical step based on test or system state.
+
+
 
 ## Security and Dependency Management (2025-06-08)
 - [x] Implement core security module with environment validation
@@ -19,6 +43,18 @@
 - [ ] Create evolution feedback loop based on logged errors
 - [ ] Add error pattern detection for common issues
 - [ ] Implement automatic recovery for known error patterns
+
+## Dependency Management and Security Layer
+- [ ] Create auto-repair solution for Python dependencies
+- [ ] Add dependency validation to each .py file
+- [ ] Implement automatic Poetry dependency management
+- [ ] Create security layer for dependency verification
+- [ ] Add environment validation on module import
+- [ ] Implement automatic environment repair
+- [ ] Create safe execution wrapper for Python code
+- [ ] Add dependency conflict resolution
+- [ ] Implement security checks for all dependencies
+- [ ] Create fallback mechanisms for missing dependencies
 
 ## Module Structure
 Each module should follow this structure:

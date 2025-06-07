@@ -27,6 +27,14 @@
 
 ELLMa is a revolutionary **self-evolving AI agent** that runs locally on your machine. Unlike traditional AI tools, ELLMa **learns and improves itself** with these key features:
 
+### 🔄 Self-Improvement & Evolution
+
+- **Automatic Code Generation**: Generates new modules and capabilities on-the-fly
+- **Continuous Learning**: Improves from interactions and feedback
+- **Evolution Engine**: Self-modifying architecture that evolves over time
+- **Performance Optimization**: Identifies and implements performance improvements
+- **Error Recovery**: Automatically detects and recovers from errors
+
 ### 🔒 Security & Dependency Management
 
 - **Automatic Environment Setup**: Ensures all dependencies are installed and configured correctly
@@ -184,8 +192,6 @@ pip install ellma
 
 ## 🛠 Development
 
-## 🛠 Development
-
 ### Setting Up Development Environment
 
 1. **Clone the repository**
@@ -194,10 +200,59 @@ pip install ellma
    cd ellma
    ```
 
-2. **Install with development dependencies**
+2. **Create and activate a virtual environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install development dependencies**
    ```bash
    pip install -e ".[dev]"
+   pip install pytest pytest-cov pytest-mock
    ```
+
+4. **Install runtime dependencies**
+   ```bash
+   pip install SpeechRecognition pyttsx3
+   ```
+
+### Running Tests
+
+Run all tests:
+```bash
+pytest -v
+```
+
+Run tests with coverage report:
+```bash
+pytest --cov=ellma --cov-report=term-missing
+```
+
+### Evolution Engine
+
+The evolution engine is a core component that enables self-improvement. It works by:
+1. Analyzing system performance and capabilities
+2. Identifying improvement opportunities
+3. Generating and testing new code
+4. Integrating successful changes
+
+To manually trigger an evolution cycle:
+```python
+from ellma.core.agent import ELLMa
+
+agent = ELLMa()
+agent.evolve()
+```
+
+### Code Style
+
+We use `black` for code formatting and `flake8` for linting. Before submitting a PR, please run:
+
+```bash
+black .
+flake8
+```
 
 3. **Set up pre-commit hooks** (recommended)
    ```bash
