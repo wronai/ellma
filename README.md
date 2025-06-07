@@ -377,8 +377,8 @@ Track your agent's performance:
 # Show agent status
 ellma status
 
-# View performance metrics
-ellma exec system.metrics
+# View system health metrics
+ellma exec system.health
 ```
 
 ### 🔍 Advanced Command Usage
@@ -388,11 +388,11 @@ ellma exec system.metrics
 ellma exec "system.scan && web.read https://example.com"
 
 # Save command output to file
-ellma exec system.scan scan_results.json
+ellma exec system.scan > scan_results.json
 
 # Use different output formats
-ellma exec system.info json
-ellma exec system.info yaml
+ellma exec system.scan --format json
+ellma exec system.scan --format yaml
 ```
 
 ### 🐚 Powerful Shell Interface
@@ -458,17 +458,20 @@ ellma/
 
 ### System Administration
 ```bash
-# Get system overview
-ellma exec system.overview
+# Run comprehensive system scan
+ellma exec system.scan
 
-# Monitor system resources
-ellma exec system.monitor --cpu --memory --disk
+# Monitor system resources (60 seconds with 5-second intervals)
+ellma exec system.monitor --duration 60 --interval 5
 
-# Find large files
-ellma exec files.find_large --path /var --min-size 100M
+# Check system health status
+ellma exec system.health
 
-# Check network connections
-ellma exec system.network_connections
+# List top processes by CPU usage
+ellma exec system.processes --sort-by cpu --limit 10
+
+# Check open network ports
+ellma exec system.ports
 ```
 
 ### Development Workflow
@@ -493,39 +496,17 @@ ellma exec code.document_function utils.py --function process_data
 # Read and extract content from a webpage
 ellma exec web.read https://example.com --extract-text --extract-links
 
-# Test API endpoints
-ellma exec web.test_endpoint https://api.example.com/data --method GET
+# Make HTTP GET request to an API endpoint
+ellma exec web.get https://api.example.com/data
+
+# Make HTTP POST request with JSON data
+ellma exec web.post https://api.example.com/data --data '{"key": "value"}'
 
 # Generate API client code
 ellma generate python --task "API client for REST service with error handling"
 ```
 
-### Data Processing
 
-```bash
-# Analyze CSV data
-ellma exec "data.analyze --file data.csv --format csv"
-
-# Convert between data formats
-ellma exec "data.convert --input data.json --output data.yaml"
-
-# Generate data visualization
-ellma generate python --task "Plot time series data from CSV"
-```
-
-### Custom Commands
-
-```bash
-# List available commands
-ellma exec system.commands
-
-# Get help for a specific command
-ellma exec "help system.scan"
-
-# Create a custom command
-ellma exec "command.create --name hello --code 'echo \"Hello, World!\"'"
-```
-ellma generate python --task="Scrape product prices with retry logic"
 ```
 
 ## 🔧 Configuration
