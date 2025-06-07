@@ -1,7 +1,30 @@
-![img_1.png](ellma-init.png)
 # 🧬 ELLMa - Evolutionary Local LLM Agent
 
 > **E**volutionary **L**ocal **LLM** **A**gent - Self-improving AI assistant that evolves with your needs
+
+[![PyPI version](https://badge.fury.io/py/ellma.svg)](https://badge.fury.io/py/ellma)
+[![Python Support](https://img.shields.io/pypi/pyversions/ellma.svg)](https://pypi.org/project/ellma/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Documentation Status](https://readthedocs.org/projects/ellma/badge/?version=latest)](https://ellma.readthedocs.io/)
+
+## 📋 Table of Contents
+
+- [🚀 Features](#-features)
+- [⚡ Quick Start](#-quick-start)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [First Steps](#first-steps)
+- [🛠 Development](#-development)
+- [🔍 Usage Examples](#-usage-examples)
+- [🧩 Extending ELLMa](#-extending-ellma)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [📚 Documentation](#-documentation)
+
+## 🚀 Features
+
+ELLMa is a revolutionary **self-evolving AI agent** that runs locally on your machine. Unlike traditional AI tools, ELLMa **learns and improves itself** with these key features:
 
 [![PyPI version](https://badge.fury.io/py/ellma.svg)](https://badge.fury.io/py/ellma)
 [![Python Support](https://img.shields.io/pypi/pyversions/ellma.svg)](https://pypi.org/project/ellma/)
@@ -12,21 +35,34 @@
 
 ELLMa is a revolutionary **self-evolving AI agent** that runs locally on your machine. Unlike traditional AI tools, ELLMa **learns and improves itself** by:
 
+### Core Capabilities
+
 - 🧬 **Self-Evolution**: Automatically generates new capabilities based on usage patterns
 - 🏠 **Local-First**: Runs entirely on your machine with complete privacy
-- 🐚 **Shell-Native**: Integrates seamlessly with your system and workflows  
+- 🐚 **Shell-Native**: Integrates seamlessly with your system and workflows
 - 🛠️ **Command Execution**: Executes commands in a structured format
 - 📦 **Modular**: Extensible architecture that grows with your needs
 - 🤖 **Multi-Model**: Supports various local LLM models
 - 🔄 **Auto-Improving**: Continuously learns from interactions
 
+### Technical Highlights
+
+- **Built-in Commands**: Wide range of system, web, and file operations
+- **Code Generation**: Generate Python, Bash, and Docker configurations
+- **Web Interaction**: Advanced web scraping and API interaction tools
+- **Plugin System**: Easy to extend with custom modules
+- **Performance Monitoring**: Built-in metrics and monitoring
+- **Cross-Platform**: Works on Linux, macOS, and Windows (WSL2 recommended for Windows)
+
 ## ⚡ Quick Start
 
 ### Prerequisites
+
 - Python 3.8+
-- pip
+- pip (Python package manager)
 - Git (for development)
 - 8GB+ RAM recommended for local models
+- For GPU acceleration: CUDA-compatible GPU (optional)
 
 ### Installation
 
@@ -85,10 +121,10 @@ pip install ellma
    # System information
    ellma exec system.scan
    
-   # Web interaction
-   ellma exec web.read 'https://example.com' --summarize
+   # Web interaction (extract text and links)
+   ellma exec web.read https://example.com --extract-text --extract-links
    
-   # File operations
+   # File operations (search for Python files)
    ellma exec files.search /path/to/directory --pattern "*.py"
    
    # Get agent status
@@ -97,33 +133,77 @@ pip install ellma
 
 ## 🛠 Development
 
-### Development Installation
+## 🛠 Development
 
+### Setting Up Development Environment
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/wronai/ellma.git
+   cd ellma
+   ```
+
+2. **Install with development dependencies**
+   ```bash
+   pip install -e ".[dev]"
+   ```
+
+3. **Set up pre-commit hooks** (recommended)
+   ```bash
+   pre-commit install
+   ```
+
+### Development Workflow
+
+#### Running Tests
 ```bash
-# Install development dependencies
-pip install -e ".[dev]"
-
-# Install pre-commit hooks
-pre-commit install
-```
-
-### Common Tasks
-
-```bash
-# Run tests
+# Run all tests
 make test
 
+# Run specific test file
+pytest tests/test_web_commands.py -v
+
+# Run with coverage report
+make test-coverage
+```
+
+#### Code Quality
+```bash
 # Run linters
 make lint
 
-# Format code
+# Auto-format code
 make format
 
-# Run type checking
+# Type checking
 make typecheck
 
-# Run security checks
+# Security checks
 make security
+```
+
+#### Documentation
+```bash
+# Build documentation
+make docs
+
+# Serve docs locally
+cd docs && python -m http.server 8000
+```
+
+### Project Structure
+
+```
+ellma/
+├── ellma/                  # Main package
+│   ├── core/              # Core functionality
+│   ├── commands/          # Built-in commands
+│   ├── generators/        # Code generation
+│   ├── models/           # Model management
+│   └── utils/            # Utilities
+├── tests/                 # Test suite
+├── docs/                 # Documentation
+└── scripts/              # Development scripts
 ```
 
 ### Project Structure
@@ -143,7 +223,9 @@ ellma/
 
 ## 🔄 Evolution & Self-Improvement
 
-ELLMa can analyze its performance and evolve its capabilities:
+ELLMa's evolution engine allows it to analyze its performance and automatically improve its capabilities.
+
+### Running Evolution
 
 ```bash
 # Run a single evolution cycle
@@ -154,17 +236,122 @@ ellma evolve --cycles 3
 
 # Force evolution even if no improvements are detected
 ellma evolve --force
+
+# Run evolution with specific parameters
+ellma evolve --learning-rate 0.2 --max-depth 5
 ```
 
 ### Monitoring Evolution
 
 ```bash
 # View evolution history
-cat ~/.ellma/evolution/evolution_history.json
+cat ~/.ellma/evolution/evolution_history.json | jq .
 
 # Monitor evolution logs
 tail -f ~/.ellma/logs/evolution.log
+
+# Get evolution status
+ellma status --evolution
 ```
+
+### Evolution Configuration
+
+You can configure the evolution process in `~/.ellma/config.yaml`:
+
+```yaml
+evolution:
+  enabled: true
+  auto_improve: true
+  learning_rate: 0.1
+  max_depth: 3
+  max_iterations: 100
+  early_stopping: true
+```
+
+## 🧩 Extending ELLMa
+
+### Creating Custom Commands
+
+1. Create a new Python module in `ellma/commands/`:
+
+```python
+from ellma.commands.base import BaseCommand
+
+class MyCustomCommand(BaseCommand):
+    """My custom command"""
+    
+    def __init__(self, agent):
+        super().__init__(agent)
+        self.name = "custom"
+        self.description = "My custom command"
+    
+    def my_action(self, param1: str, param2: int = 42):
+        """Example action"""
+        return {"result": f"Got {param1} and {param2}"}
+```
+
+2. Register your command in `ellma/commands/__init__.py`
+
+### Creating Custom Modules
+
+1. Create a new module class:
+
+```python
+from ellma.core.module import BaseModule
+
+class MyCustomModule(BaseModule):
+    def __init__(self, agent):
+        super().__init__(agent)
+        self.name = "my_module"
+        self.version = "1.0.0"
+    
+    def setup(self):
+        # Initialization code
+        pass
+    
+    def execute(self, command: str, *args, **kwargs):
+        # Handle commands
+        if command == "greet":
+            return f"Hello, {kwargs.get('name', 'World')}!"
+        raise ValueError(f"Unknown command: {command}")
+```
+
+2. Register your module in the agent's configuration
+
+## 🤝 Contributing
+
+We welcome contributions! Here's how you can help:
+
+1. **Report Bugs**: Open an issue with detailed steps to reproduce
+2. **Suggest Features**: Share your ideas for new features
+3. **Submit Pull Requests**: Follow these steps:
+   - Fork the repository
+   - Create a feature branch
+   - Make your changes
+   - Add tests
+   - Update documentation
+   - Submit a PR
+
+### Development Guidelines
+
+- Follow [PEP 8](https://peps.python.org/pep-0008/) style guide
+- Write docstrings for all public functions and classes
+- Add type hints for better code clarity
+- Write tests for new features
+- Update documentation when making changes
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## 📚 Documentation
+
+For complete documentation, visit [ellma.readthedocs.io](https://ellma.readthedocs.io/)
+
+## 🙏 Acknowledgments
+
+- Thanks to all contributors who have helped improve ELLMa
+- Built with ❤️ by the ELLMa team
 
 ## 🎯 Core Features
 
@@ -198,14 +385,14 @@ ellma exec system.metrics
 
 ```bash
 # Chain multiple commands
-ellma exec "system.scan && web.read https://example.com --summarize"
+ellma exec "system.scan && web.read https://example.com"
 
 # Save command output to file
-ellma exec system.scan --output scan_results.json
+ellma exec system.scan scan_results.json
 
 # Use different output formats
-ellma exec system.info --format json
-ellma exec system.info --format yaml
+ellma exec system.info json
+ellma exec system.info yaml
 ```
 
 ### 🐚 Powerful Shell Interface
@@ -297,17 +484,17 @@ ellma generate docker --task "Python app with PostgreSQL and Redis"
 ellma generate test --file app/main.py --framework pytest
 
 # Document a Python function
-ellma exec "code.document_function --file utils.py --function process_data"
+ellma exec code.document_function utils.py --function process_data
 ```
 
 ### Web & API Interaction
 
 ```bash
-# Read and summarize a webpage
-ellma exec "web.read https://example.com --summarize --extract-links"
+# Read and extract content from a webpage
+ellma exec web.read https://example.com --extract-text --extract-links
 
 # Test API endpoints
-ellma exec "web.test_endpoint --url https://api.example.com/data --method GET"
+ellma exec web.test_endpoint https://api.example.com/data --method GET
 
 # Generate API client code
 ellma generate python --task "API client for REST service with error handling"

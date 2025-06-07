@@ -353,25 +353,56 @@ class EvolutionEngine:
     def _generate_solutions(self, opportunities: List[Dict]) -> List[Dict]:
         """Generate solutions for identified opportunities"""
         solutions = []
+        total_ops = len(opportunities)
+        
+        if total_ops == 0:
+            self.console.print("[yellow]No opportunities found to generate solutions for[/yellow]")
+            return solutions
 
         with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
+                BarColumn(bar_width=None),
+                "•",
+                TextColumn("({task.completed}/{task.total})"),
+                "•",
+                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
                 console=self.console
         ) as progress:
+            task = progress.add_task(
+                "[cyan]Generating solutions...",
+                total=total_ops
+            )
 
-            task = progress.add_task("Generating solutions...", total=len(opportunities))
-
-            for opportunity in opportunities:
+            for i, opportunity in enumerate(opportunities, 1):
                 try:
+                    # Log which opportunity is being processed
+                    desc = opportunity.get('description', 'No description')
+                    progress.console.print(
+                        f"[dim]Processing opportunity {i}/{total_ops}: {desc[:100]}{'...' if len(desc) > 100 else ''}"
+                    )
+                    
+                    # Generate the solution
                     solution = self._generate_single_solution(opportunity)
+                    
                     if solution:
                         solutions.append(solution)
-                        progress.advance(task)
-                except Exception as e:
-                    logger.error(f"Failed to generate solution for {opportunity}: {e}")
+                        progress.console.print(
+                            f"[green]✓ Generated solution for: {desc[:80]}{'...' if len(desc) > 80 else ''}"
+                        )
+                    else:
+                        progress.console.print(
+                            f"[yellow]⚠️  No solution generated for: {desc[:80]}{'...' if len(desc) > 80 else ''}"
+                        )
+                        
                     progress.advance(task)
+                    
+                except Exception as e:
+                    error_msg = f"Failed to generate solution for {opportunity.get('description', 'unknown')}: {str(e)}"
+                    logger.error(error_msg)
+                    progress.console.print(f"[red]✗ {error_msg}")
+                    progress.advance(task)
+                    continue
 
         return solutions
 
