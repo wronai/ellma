@@ -452,10 +452,10 @@ ellma exec system.health
 ellma exec system.scan
 
 # Read web page content
-ellma exec "web.read('https://example.com')"
+ellma exec web.read https://example.com
 
 # Read web page with link extraction
-ellma exec "web.read('https://example.com', extract_links=True, extract_text=True)"
+ellma exec web.read https://example.com extract_links true extract_text true
 
 # Quick system health check
 ellma exec system.health
@@ -475,8 +475,8 @@ ellma shell
 # In the shell, you can run commands like:
 ellma> system.health
 ellma> system.scan
-ellma> web.read('https://example.com')
-ellma> web.read('https://example.com', extract_links=True, extract_text=True)
+ellma> web.read https://example.com
+ellma> web.read https://example.com extract_links true extract_text true
 ```
 
 Example shell session:
@@ -487,18 +487,18 @@ Type 'help' for available commands, 'exit' to quit
 # Available commands:
 # - system.health: Check system health
 # - system.scan: Perform system scan
-# - web.read('https://example.com'): Read web page content
-# - web.read('https://example.com', extract_links=True, extract_text=True): Read web page with link extraction
+# - web.read [url]: Read web page content
+# - web.read [url] extract_links true extract_text true: Read web page with link extraction
 # - help: Show available commands
 
 ellma> system.health
 {'status': 'HEALTHY', 'cpu_usage': 12.5, 'memory_usage': 45.2, ...}
 
-ellma> web.read https://example.com
+ellma> web.read example.com
 {'status': 200, 'title': 'Example Domain', 'content_length': 1256, ...}
 
-# For commands with parameters, use space-separated arguments
-ellma> web.read https://example.com extract_links=True
+# For commands with parameters, use space-separated values
+ellma> web.read example.com extract_links true extract_text true
 ```
 
 ### 🛠️ Multi-Language Code Generation
