@@ -5,7 +5,8 @@ import os
 import sys
 import resource
 import psutil
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
+from ellma.utils.logger import get_logger
 
 def set_system_limits() -> Dict[str, int]:
     """
@@ -49,40 +50,75 @@ def get_system_status() -> Dict[str, Any]:
     Returns:
         Dict containing system resource information
     """
+    status = {
+        'cpu': {},
+        'memory': {},
+        'disk': {},
+        'process': {}
+    }
+    
     try:
-        process = psutil.Process()
-        mem = psutil.virtual_memory()
+        # CPU information
+        cpu_percent = psutil.cpu_percent(interval=1)
+        cpu_count = psutil.cpu_count()
+        cpu_freq = psutil.cpu_freq()
         
-        return {
-            'cpu': {
-                'percent': psutil.cpu_percent(),
-                'count': psutil.cpu_count(),
-                'load': os.getloadavg()
-            },
-            'memory': {
-                'total': mem.total,
-                'available': mem.available,
-                'percent': mem.percent,
-                'used': mem.used,
-                'free': mem.free
-            },
-            'process': {
+        status['cpu'].update({
+            'percent': cpu_percent,
+            'cores': cpu_count,
+            'current_freq': cpu_freq.current if cpu_freq else None,
+            'max_freq': cpu_freq.max if cpu_freq else None
+        })
+        
+        # Memory information
+        mem = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+        
+        status['memory'].update({
+            'total': mem.total,
+            'available': mem.available,
+            'percent': mem.percent,
+            'used': mem.used,
+            'free': mem.free,
+            'swap_total': swap.total,
+            'swap_used': swap.used,
+            'swap_free': swap.free,
+            'swap_percent': swap.percent
+        })
+        
+        # Disk information
+        disk = psutil.disk_usage('/')
+        disk_io = psutil.disk_io_counters()
+        
+        status['disk'].update({
+            'total': disk.total,
+            'used': disk.used,
+            'free': disk.free,
+            'percent': disk.percent,
+            'read_count': disk_io.read_count if disk_io else 0,
+            'write_count': disk_io.write_count if disk_io else 0,
+            'read_bytes': disk_io.read_bytes if disk_io else 0,
+            'write_bytes': disk_io.write_bytes if disk_io else 0
+        })
+        
+        # Process information
+        process = psutil.Process()
+        with process.oneshot():
+            status['process'].update({
                 'pid': process.pid,
+                'name': process.name(),
+                'status': process.status(),
+                'create_time': process.create_time(),
+                'cpu_percent': process.cpu_percent(),
+                'memory_percent': process.memory_percent(),
                 'memory_info': process.memory_info()._asdict(),
-                'cpu_percent': process.cpu_percent(interval=0.1),
                 'num_threads': process.num_threads(),
-                'open_files': len(process.open_files()),
                 'connections': len(process.connections())
-            },
-            'limits': {
-                'open_files': resource.getrlimit(resource.RLIMIT_NOFILE),
-                'max_processes': resource.getrlimit(resource.RLIMIT_NPROC)
-            },
-            'environment': {
-                'OMP_NUM_THREADS': os.environ.get('OMP_NUM_THREADS'),
-                'MKL_NUM_THREADS': os.environ.get('MKL_NUM_THREADS'),
-                'PYTHONPATH': os.environ.get('PYTHONPATH')
-            }
-        }
+            })
+            
     except Exception as e:
-        return {'error': f"Could not get system status: {str(e)}"}
+        logger = get_logger(__name__)
+        logger.error(f"Error getting system status: {e}", exc_info=True)
+        status['error'] = str(e)
+    
+    return status
