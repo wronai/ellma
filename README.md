@@ -18,6 +18,7 @@
 - [🛠 Development](#-development)
 - [🔍 Usage Examples](#-usage-examples)
 - [🧩 Extending ELLMa](#-extending-ellma)
+- [⚙️ Generated Utilities](#️-generated-utilities)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 - [📚 Documentation](#-documentation)
@@ -279,6 +280,20 @@ from ellma.commands.base import BaseCommand
 
 class MyCustomCommand(BaseCommand):
     """My custom command"""
+```
+
+2. Register your command in `ellma/commands/__init__.py`
+3. Restart ELLMa to load your new command
+
+## ⚙️ Generated Utilities
+
+ELLMa includes a powerful set of self-generated utilities for common programming tasks. These include:
+
+- 🛡️ **Enhanced Error Handling**: Automatic retries with exponential backoff
+- ⚡ **Performance Caching**: In-memory cache with TTL support
+- 🚀 **Parallel Processing**: Easy parallel execution of tasks
+
+See the [Generated Utilities Documentation](docs/generated_utilities.md) for detailed usage and examples.
     
     def __init__(self, agent):
         super().__init__(agent)
