@@ -21,6 +21,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from ellma import ELLMaError, ModelNotFoundError, ModuleLoadError, CommandError
 from ellma.utils.logger import get_logger
 from ellma.utils.config import ConfigManager
+from ellma.utils.system import set_system_limits, get_system_status
 from ellma.modules.registry import ModuleRegistry
 from ellma.commands.base import BaseCommand
 
@@ -66,6 +67,22 @@ class ELLMa:
         self.auto_evolve = auto_evolve
         self.verbose = verbose
         
+        # Set system resource limits
+        self.system_limits = set_system_limits()
+        if self.verbose:
+            self.console.print("[yellow]System limits set:[/yellow]")
+            for k, v in self.system_limits.items():
+                self.console.print(f"  - {k}: {v}")
+            
+            # Log system status
+            status = get_system_status()
+            if 'error' not in status:
+                self.console.print("\n[yellow]System status:[/yellow]")
+                self.console.print(f"  - CPU: {status['cpu']['percent']}% ({status['cpu']['count']} cores)")
+                self.console.print(f"  - Memory: {status['memory']['percent']}% used ({status['memory']['available']/1024/1024:.1f}MB available)")
+                self.console.print(f"  - Process threads: {status['process']['num_threads']}")
+                self.console.print(f"  - Open files: {status['process']['open_files']}/{status['limits']['open_files'][0]}")
+        
         # Initialize paths and directories
         self.home_dir = Path.home() / ".ellma"
         self.models_dir = self.home_dir / "models"
@@ -80,9 +97,19 @@ class ELLMa:
         self.config = {}
         
         # Set model path (either from parameter or auto-detect)
-        self.model_path = None
-        if model_path and Path(model_path).exists():
-            self.model_path = Path(model_path)
+        self.model_path = Path(model_path) if model_path else None
+        
+        # Initialize LLM if model is available
+        if self.model_path and self.model_path.exists():
+            try:
+                self._initialize_llm()
+            except Exception as e:
+                logger.error(f"Failed to initialize LLM: {e}")
+                if "OMP" in str(e) or "thread" in str(e).lower():
+                    logger.warning("This might be a threading issue. Try setting OMP_NUM_THREADS=1 in your environment.")
+                raise
+        else:
+            logger.warning("No model loaded. Use 'load_model' to load a model.")
         
         # Now load the config which depends on model_path
         self._load_config()

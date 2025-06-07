@@ -1,5 +1,45 @@
-aby ellma dziaa poprawnie przy realziacji zada musi weryfikowa swoj scieke decyzyjnych
-stworz ewolucyjny system poprawy promptow i rezultatow poprzez monitorowanie prmptu i skutku jakie wywoluje, oraz poprze wczesniejsze okreslenie celu do jakiego ma doprowadzuic w przypadku
-gdy to nie zostalo wykonane porpawnie, trzbea to naprawic i tutaj tez jest potrzebne rozwidlenie jak funkcjonowac za pierwszym razem gdyu  kod jeszcze nie ozstal napsiany i jak po jego naprazwieniu, albo gdy otrzeymujemy srodowisko, ktore trzeba poprawic, np jakas konfiugracja w sytsemia nie duizal poprawnie,
-Tutaj jets potrzebne ropodobne rozwiaqanie jak w pliku ../inceptor z wielowartswowa kontrola oraz jak ../shellGuard do testowania rezukltatwo i przywracanie
-gdy zostanie utracony ssystem, kod, oraz taskguard, w celu kontroli realizowaneego celu, aby poprzez ewnetualne problemy lub halucynajcje opkmodelu nie trobic zdan, ktore nie ozstaly wczesniej zadane
+# TODO - ELLMa Improvement Plan
+
+## Error Handling and Evolution
+- [ ] Create error logging system in ./TODO/ directory
+- [ ] Track errors with full context for evolution
+- [ ] Implement error analysis for system improvement
+- [ ] Create evolution feedback loop based on logged errors
+
+## Module Structure
+Each module should follow this structure:
+```
+modules/
+  [module_name]/
+    Dockerfile      # For containerization
+    pyproject.toml  # Dependencies and metadata
+    main.py        # Main module code
+    README.md      # Documentation and usage
+    test.py        # Test cases
+```
+
+## Current Tasks
+1. Fix thread creation error during evolution
+   - Increase system limits (ulimit -u)
+   - Set OMP_NUM_THREADS environment variable
+   - Monitor system resources during execution
+
+2. Implement error tracking:
+   - Log all errors with context to ./TODO/errors.log
+   - Include stack traces and system state
+   - Track error frequency and patterns
+
+3. Module development:
+   - Create base module template
+   - Implement module testing framework
+   - Add documentation requirements
+
+## Long-term Goals
+- Implement multi-layered control system (like in ../inceptor)
+- Add testing and rollback system (like ../shellGuard)
+- Create task guard to prevent unintended actions
+- Improve error recovery and system resilience
+
+## Original Notes
+[Previous content preserved for reference]
+

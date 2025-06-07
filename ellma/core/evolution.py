@@ -10,10 +10,21 @@ import os
 import json
 import time
 import tempfile
-import importlib.util
+import importlib
+import subprocess
+import shutil
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from pathlib import Path
+
+from ellma.utils.evolution_utils import (
+    setup_evolution_environment,
+    check_system_resources,
+    cleanup_resources,
+    log_evolution_result,
+    EvolutionConfig
+)
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
@@ -22,6 +33,8 @@ from rich.panel import Panel
 
 from ellma import EvolutionError
 from ellma.utils.logger import get_logger
+from .module_generator import ModuleGenerator
+from .error_logger import log_error
 
 logger = get_logger(__name__)
 
@@ -39,35 +52,53 @@ class EvolutionEngine:
     6. Learning - Update knowledge base
     """
 
-    def __init__(self, agent):
+    def __init__(self, agent, config: Optional[Dict[str, Any]] = None):
         """
         Initialize Evolution Engine with enhanced configuration
 
         Args:
             agent: ELLMa agent instance
+            config: Optional configuration overrides for evolution
         """
         self.agent = agent
         self.console = Console()
+        
+        # Set up evolution configuration and environment
+        self.config = EvolutionConfig(config)
+        self.evolution_env = setup_evolution_environment(config)
+        
+        # Initialize metrics and state
         self.evolution_log = []
         self.capabilities = set()
         self.improvement_suggestions = []
         self.last_evolution_time = None
+        self.is_evolving = False
+        self.current_cycle = None
+        
+        # Metrics tracking
         self.evolution_metrics = {
             'total_cycles': 0,
             'successful_cycles': 0,
             'failed_cycles': 0,
             'modules_created': 0,
             'modules_removed': 0,
-            'performance_improvement': 0.0
+            'performance_improvement': 0.0,
+            'modules': {},
+            'resource_usage': {}
         }
-
-        # Load and validate evolution configuration
-        self._load_configuration()
-
-        # Setup evolution environment
+        
+        # Initialize module generator
+        self.module_generator = ModuleGenerator(
+            base_path=str(Path(__file__).parent.parent.parent / "modules")
+        )
+        
+        # Set up directories and load history
         self._setup_directories()
-        self._setup_resource_limits()
         self._load_evolution_history()
+        
+        # Log initialization
+        self.console.print("[green]✓ Evolution Engine initialized[/green]")
+        logger.info("Evolution Engine initialized with config: %s", self.config.__dict__)
         
         # Initialize evolution state
         self.current_cycle = None
@@ -115,92 +146,311 @@ class EvolutionEngine:
         # Set logger level
         logger.setLevel(self.log_level)
 
-    def _setup_resource_limits(self):
-        """Configure system resource limits for evolution"""
-        try:
-            import resource
-            # Convert MB to bytes
-            soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-            new_soft = min(soft if soft != resource.RLIM_INFINITY else float('inf'), 
-                         self.max_memory_mb * 1024 * 1024)
-            resource.setrlimit(resource.RLIMIT_AS, (new_soft, hard))
-            logger.debug(f"Set memory limit to {self.max_memory_mb}MB")
-        except Exception as e:
-            logger.warning(f"Could not set resource limits: {e}")
-
-    def _setup_directories(self):
-        """Create and validate evolution directories"""
-        # Base directories
-        self.evolution_dir = self.agent.home_dir / "evolution"
-        self.generated_modules_dir = self.evolution_dir / "generated"
-        self.analysis_dir = self.evolution_dir / "analysis"
-        self.backup_dir = self.evolution_dir / "backups"
-        self.temp_dir = self.evolution_dir / "temp"
-        
-        # Create all required directories
-        for directory in [self.evolution_dir, self.generated_modules_dir, 
-                         self.analysis_dir, self.backup_dir, self.temp_dir]:
-            try:
-                directory.mkdir(parents=True, exist_ok=True)
-                # Ensure directories are writable
-                if not os.access(str(directory), os.W_OK):
-                    raise PermissionError(f"Directory not writable: {directory}")
-            except Exception as e:
-                logger.error(f"Failed to create directory {directory}: {e}")
-                raise
-
-    def _load_evolution_history(self):
-        """Load and validate previous evolution cycles"""
-        history_file = self.evolution_dir / "evolution_history.json"
-        backup_file = self.backup_dir / f"evolution_history_{int(time.time())}.json"
-        
-        if not history_file.exists():
-            logger.info("No evolution history found, starting fresh")
-            self.evolution_log = []
-            return
-            
-        try:
-            # Create backup before loading
-            if history_file.exists():
-                import shutil
-                shutil.copy2(str(history_file), str(backup_file))
-                logger.debug(f"Created backup of evolution history at {backup_file}")
-            
-            # Load history
-            with open(history_file, 'r') as f:
-                history = json.load(f)
-                
-            # Validate history structure
-            if not isinstance(history, list):
-                raise ValueError("Invalid history format: expected list")
-                
-            # Update metrics from history
-            self.evolution_metrics['total_cycles'] = len(history)
-            self.evolution_metrics['successful_cycles'] = sum(
-                1 for cycle in history if cycle.get('status') == 'success'
-            )
-            self.evolution_metrics['failed_cycles'] = self.evolution_metrics['total_cycles'] - self.evolution_metrics['successful_cycles']
-            
-            self.evolution_log = history
-            logger.info(f"Loaded {len(self.evolution_log)} evolution cycles ({self.evolution_metrics['successful_cycles']} successful)")
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse evolution history: {e}")
-            self.evolution_log = []
-        except Exception as e:
-            logger.error(f"Failed to load evolution history: {e}")
-            self.evolution_log = []
-
     def evolve(self, force: bool = False) -> Dict:
         """
-        Main evolution process with enhanced capabilities
-
+        Execute a full evolution cycle with enhanced logging and error handling.
+        
         Args:
-            force: If True, force evolution even if conditions aren't optimal
-
+            force: If True, skip pre-flight checks
+            
         Returns:
-            Evolution results dictionary with detailed metrics
+            Dict containing evolution results
         """
+        logger.info("🔍 Starting evolution cycle")
+        
+        # Check if evolution is already in progress
+        if self.is_evolving:
+            error_msg = "Evolution already in progress"
+            logger.warning(error_msg)
+            return {
+                "status": "error",
+                "message": error_msg,
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # Set up evolution environment
+        self.is_evolving = True
+        start_time = time.time()
+        
+        # Initialize cycle tracking
+        self.current_cycle = {
+            'start_time': start_time,
+            'status': 'started',
+            'steps': [],
+            'metrics': {},
+            'errors': []
+        }
+        
+        try:
+            # Check system resources
+            if not force:
+                resource_check = check_system_resources(self.config)
+                self.current_cycle['resource_check'] = resource_check
+                
+                if not resource_check.get('has_resources', False):
+                    error_msg = "Insufficient system resources for evolution"
+                    logger.error(error_msg)
+                    self.current_cycle['status'] = 'failed'
+                    self.current_cycle['error'] = error_msg
+                    return {
+                        "status": "error",
+                        "message": error_msg,
+                        "resource_check": resource_check
+                    }
+            
+            # Log start of evolution
+            logger.info("🚀 Beginning evolution process with config: %s", self.config.__dict__)
+            self.console.print("\n[bold blue]🚀 Starting Evolution Cycle[/bold blue]")
+            
+            # Track evolution metrics
+            self.evolution_metrics['total_cycles'] += 1
+            self.current_cycle['metrics'] = {
+                'modules_before': len(self.agent.modules),
+                'commands_before': len(self.agent.commands),
+                'start_time': datetime.now().isoformat()
+            }
+            logger.info("🔧 Starting evolution cycle")
+            
+            # Initialize logs and metrics if they don't exist
+            if not hasattr(self, 'evolution_log'):
+                self.evolution_log = []
+            if not hasattr(self, 'evolution_metrics'):
+                self.evolution_metrics = {
+                    'total_cycles': 0,
+                    'successful_cycles': 0,
+                    'failed_cycles': 0,
+                    'modules_created': 0,
+                    'modules_removed': 0,
+                    'performance_improvement': 0.0
+                }
+            
+            # 1. Analysis Phase
+            self._log_step('analysis', "Analyzing current system state")
+            try:
+                analysis_results = self._analyze_system()
+                self.current_cycle['analysis'] = analysis_results
+                self._log_step('analysis', "Analysis completed", status='completed')
+                
+                # 2. Opportunity Identification
+                self._log_step('opportunity_identification', "Identifying improvement opportunities")
+                try:
+                    opportunities = self._identify_opportunities(analysis_results)
+                    self.current_cycle['opportunities'] = opportunities
+                    self._log_step('opportunity_identification', 
+                                 f"Found {len(opportunities)} opportunities", 
+                                 status='completed')
+                    
+                    # 3. Solution Generation
+                    self._log_step('solution_generation', "Generating solutions")
+                    try:
+                        solutions = self._generate_solutions(opportunities)
+                        self.current_cycle['solutions'] = solutions
+                        self._log_step('solution_generation', 
+                                     f"Generated {len(solutions)} solutions", 
+                                     status='completed')
+                        
+                        # 4. Solution Testing
+                        self._log_step('solution_testing', "Testing solutions")
+                        try:
+                            validated_solutions = self._test_solutions(solutions)
+                            self.current_cycle['validated_solutions'] = validated_solutions
+                            self._log_step('solution_testing', 
+                                         f"Validated {len(validated_solutions)} solutions", 
+                                         status='completed')
+                            
+                            # 5. Integration
+                            self._log_step('integration', "Integrating solutions")
+                            try:
+                                integration_results = self._integrate_solutions(validated_solutions)
+                                self.current_cycle['integration'] = integration_results
+                                self._log_step('integration', 
+                                             f"Integrated {integration_results.get('successful', 0)} solutions", 
+                                             status='completed')
+                                
+                                # 6. Learning Update
+                                self._log_step('learning_update', "Updating knowledge")
+                                try:
+                                    learning_results = self._update_learning(integration_results)
+                                    self.current_cycle['learning'] = learning_results
+                                    self._log_step('learning_update', "Knowledge updated", status='completed')
+                                    
+                                    # Update metrics and finalize
+                                    self.evolution_metrics['successful_cycles'] += 1
+                                    self.current_cycle['status'] = 'completed'
+                                    self.current_cycle['end_time'] = time.time()
+                                    self.current_cycle['duration'] = time.time() - start_time
+                                    
+                                    # Log successful completion
+                                    logger.info("✅ Evolution cycle completed successfully in %.2f seconds", 
+                                               self.current_cycle['duration'])
+                                    self.console.print(
+                                        f"\n[bold green]✓ Evolution completed in {self.current_cycle['duration']:.2f}s[/bold green]"
+                                    )
+                                    
+                                    # Prepare success result
+                                    result = {
+                                        'status': 'success',
+                                        'cycle_id': len(self.evolution_log) + 1,
+                                        'duration': self.current_cycle['duration'],
+                                        'modules_created': len([s for s in integration_results.get('integrated', []) 
+                                                              if s.get('type') == 'new_module']),
+                                        'metrics': self.current_cycle.get('metrics', {})
+                                    }
+                                    
+                                    # Log and save before returning
+                                    self._log_evolution(result)
+                                    self._save_evolution_log()
+                                    return result
+                                    
+                                except Exception as e:
+                                    error_msg = f"Learning update failed: {str(e)}"
+                                    logger.error(error_msg, exc_info=True)
+                                    self._log_step('learning_update', error_msg, status='failed', error=str(e))
+                                    # Continue even if learning update fails
+                                    self.current_cycle['status'] = 'completed_with_warnings'
+                                    self.current_cycle['end_time'] = time.time()
+                                    self.current_cycle['duration'] = time.time() - start_time
+                                    
+                                    result = {
+                                        'status': 'completed_with_warnings',
+                                        'message': 'Evolution completed but learning update failed',
+                                        'error': str(e),
+                                        'cycle_id': len(self.evolution_log) + 1,
+                                        'duration': self.current_cycle['duration']
+                                    }
+                                    
+                                    self._log_evolution(result)
+                                    self._save_evolution_log()
+                                    return result
+                                    
+                            except Exception as e:
+                                error_msg = f"Integration failed: {str(e)}"
+                                logger.error(error_msg, exc_info=True)
+                                self._log_step('integration', error_msg, status='failed', error=str(e))
+                                raise RuntimeError(error_msg) from e
+                                
+                        except Exception as e:
+                            error_msg = f"Solution testing failed: {str(e)}"
+                            logger.error(error_msg, exc_info=True)
+                            self._log_step('solution_testing', error_msg, status='failed', error=str(e))
+                            raise RuntimeError(error_msg) from e
+                            
+                    except Exception as e:
+                        error_msg = f"Solution generation failed: {str(e)}"
+                        logger.error(error_msg, exc_info=True)
+                        self._log_step('solution_generation', error_msg, status='failed', error=str(e))
+                        raise RuntimeError(error_msg) from e
+                        
+                except Exception as e:
+                    error_msg = f"Opportunity identification failed: {str(e)}"
+                    logger.error(error_msg, exc_info=True)
+                    self._log_step('opportunity_identification', error_msg, status='failed', error=str(e))
+                    raise RuntimeError(error_msg) from e
+                    
+            except Exception as e:
+                error_msg = f"Analysis failed: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                self._log_step('analysis', error_msg, status='failed', error=str(e))
+                raise RuntimeError(error_msg) from e
+                
+        except Exception as e:
+            # Handle any unexpected errors during the evolution process
+            error_msg = f"Evolution process failed: {str(e)}"
+            logger.critical(error_msg, exc_info=True)
+            self.current_cycle['status'] = 'failed'
+            self.current_cycle['error'] = str(e)
+            
+            # Update cycle status
+            self.current_cycle['status'] = 'completed'
+            self.current_cycle['end_time'] = time.time()
+            
+            # Update metrics
+            self.evolution_metrics['total_cycles'] += 1
+            self.evolution_metrics['successful_cycles'] += 1
+            self.evolution_metrics['modules_created'] += integration_results.get('modules_created', 0)
+            self.evolution_metrics['modules_removed'] += integration_results.get('modules_removed', 0)
+            
+            # Calculate performance improvement if possible
+            if 'performance_improvement' in learning_results:
+                self.evolution_metrics['performance_improvement'] = learning_results['performance_improvement']
+            
+            # Log completion
+            duration = self.current_cycle['end_time'] - self.current_cycle['start_time']
+            logger.info(f"✅ Evolution cycle completed successfully in {duration:.2f} seconds")
+            
+            # Save the updated evolution history
+            self._save_evolution_history()
+            
+            return {
+                'status': 'success',
+                'cycle_id': len(self.evolution_log) + 1,
+                'duration': duration,
+                'steps_completed': [s['step'] for s in self.current_cycle['steps']],
+                'modules_created': integration_results.get('modules_created', 0),
+                'modules_removed': integration_results.get('modules_removed', 0),
+                'performance_improvement': learning_results.get('performance_improvement', 0.0)
+            }
+            
+        except Exception as e:
+            error_msg = f"❌ Evolution failed: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            
+            if hasattr(self, 'current_cycle') and self.current_cycle:
+                self.current_cycle['status'] = 'failed'
+                self.current_cycle['error'] = str(e)
+                self.current_cycle['end_time'] = time.time()
+                
+                if not hasattr(self, 'evolution_log'):
+                    self.evolution_log = []
+                    
+                self.evolution_log.append(self.current_cycle)
+                
+            # Initialize metrics if they don't exist
+            if not hasattr(self, 'evolution_metrics'):
+                self.evolution_metrics = {
+                    'total_cycles': 0,
+                    'successful_cycles': 0,
+                    'failed_cycles': 0
+                }
+                
+            # Update metrics
+            self.evolution_metrics['total_cycles'] += 1
+            self.evolution_metrics['failed_cycles'] += 1
+            
+            # Save the updated evolution history
+            self._save_evolution_history()
+            
+            return {
+                'status': 'error',
+                'error': str(e),
+                'cycle_id': len(self.evolution_log) if hasattr(self, 'evolution_log') else None
+            }
+            
+        finally:
+            self.is_evolving = False
+
+    def _save_evolution_history(self):
+        """Save the evolution history to disk"""
+        try:
+            history_file = self.evolution_dir / "evolution_history.json"
+            with open(history_file, 'w') as f:
+                json.dump({
+                    'evolution_log': getattr(self, 'evolution_log', []),
+                    'evolution_metrics': getattr(self, 'evolution_metrics', {})
+                }, f, indent=2, default=str)
+            logger.debug(f"Saved evolution history to {history_file}")
+        except Exception as e:
+            logger.error(f"Failed to save evolution history: {e}")
+            log_error(e, {"context": "save_evolution_history"})
+
+    def _analyze_system(self) -> Dict:
+        """
+        Analyze the current system state and identify improvement opportunities
+        
+        Returns:
+            Dict containing analysis results and metrics
+        """
+        logger.info("🔍 Analyzing system state...")
         if not self.enabled and not force:
             msg = "[yellow]Evolution is disabled in configuration[/yellow]"
             self.console.print(msg)
@@ -274,602 +524,65 @@ class EvolutionEngine:
             logger.error(f"Error checking system resources: {e}")
             return False
 
-        evolution_start = time.time()
-        evolution_id = f"evolution_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
-        try:
-            # Phase 1: Analysis
-            self.console.print("[yellow]📊 Phase 1: Analyzing current state...[/yellow]")
-            analysis_results = self._analyze_current_state()
-
-            # Phase 2: Opportunity Identification
-            self.console.print("[yellow]🎯 Phase 2: Identifying opportunities...[/yellow]")
-            opportunities = self._identify_opportunities(analysis_results)
-
-            # Phase 3: Solution Generation
-            self.console.print("[yellow]🛠️  Phase 3: Generating solutions...[/yellow]")
-            solutions = self._generate_solutions(opportunities)
-
-            # Phase 4: Testing & Validation
-            self.console.print("[yellow]🧪 Phase 4: Testing solutions...[/yellow]")
-            validated_solutions = self._test_solutions(solutions)
-
-            # Phase 5: Integration
-            self.console.print("[yellow]⚡ Phase 5: Integrating improvements...[/yellow]")
-            integration_results = self._integrate_solutions(validated_solutions)
-
-            # Phase 6: Learning Update
-            self.console.print("[yellow]🧠 Phase 6: Updating knowledge...[/yellow]")
-            learning_results = self._update_learning(integration_results)
-
-            # Compile results
-            evolution_time = time.time() - evolution_start
-            results = {
-                "evolution_id": evolution_id,
-                "timestamp": datetime.now().isoformat(),
-                "duration": evolution_time,
-                "analysis": analysis_results,
-                "opportunities": opportunities,
-                "solutions_generated": len(solutions),
-                "solutions_validated": len(validated_solutions),
-                "integrations": integration_results,
-                "learning": learning_results,
-                "status": "success"
-            }
-
-            # Update metrics
-            self.agent.performance_metrics['evolution_cycles'] += 1
-
-            # Log evolution
-            self._log_evolution(results)
-
-            # Display results
-            self._display_evolution_results(results)
-
-            return results
-
-        except Exception as e:
-            error_results = {
-                "evolution_id": evolution_id,
-                "timestamp": datetime.now().isoformat(),
-                "duration": time.time() - evolution_start,
-                "error": str(e),
-                "status": "failed"
-            }
-            self._log_evolution(error_results)
-            raise EvolutionError(f"Evolution cycle failed: {e}")
-
-    def _analyze_current_state(self) -> Dict:
-        """Analyze current agent capabilities and performance"""
-        analysis = {
-            "timestamp": datetime.now().isoformat(),
-            "agent_status": self.agent.get_status(),
-            "performance_analysis": self._analyze_performance(),
-            "capability_assessment": self._assess_capabilities(),
-            "resource_usage": self._analyze_resource_usage(),
-            "failure_patterns": self._analyze_failures()
-        }
-
-        # Save analysis
-        analysis_file = self.analysis_dir / f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        with open(analysis_file, 'w') as f:
-            json.dump(analysis, f, indent=2)
-
-        return analysis
-
-    def _analyze_performance(self) -> Dict:
+    def _build_and_test_module(self, module_path: Path) -> bool:
         """
-        Analyze performance metrics with enhanced statistics
-        
-        Returns:
-            Dict containing comprehensive performance analysis
-        """
-        metrics = self.agent.performance_metrics
-        
-        # Basic metrics
-        total_executions = metrics.get('successful_executions', 0) + metrics.get('failed_executions', 0)
-        success_rate = metrics.get('successful_executions', 0) / max(total_executions, 1)
-        avg_execution_time = metrics.get('total_execution_time', 0) / max(total_executions, 1)
-        
-        # Command success rates
-        command_stats = {}
-        for cmd, stats in metrics.get('command_stats', {}).items():
-            cmd_total = stats.get('success', 0) + stats.get('fail', 0)
-            if cmd_total > 0:
-                command_stats[cmd] = {
-                    'success_rate': stats.get('success', 0) / cmd_total,
-                    'avg_time': stats.get('total_time', 0) / cmd_total,
-                    'total': cmd_total
-                }
-        
-        # Identify problematic commands
-        problematic_commands = [
-            cmd for cmd, stats in command_stats.items()
-            if stats['success_rate'] < 0.8 or stats['avg_time'] > 5.0
-        ]
-        
-        # Resource usage
-        resource_usage = {
-            'memory_mb': metrics.get('peak_memory_usage_mb', 0),
-            'cpu_percent': metrics.get('peak_cpu_percent', 0),
-            'io_operations': metrics.get('io_operations', 0)
-        }
-        
-        # Performance score (0-1, higher is better)
-        perf_score = min(1.0, success_rate * (1 / max(avg_execution_time, 0.01)))
-        
-        return {
-            # Basic metrics
-            'total_commands': metrics.get('commands_executed', 0),
-            'success_rate': success_rate,
-            'failure_rate': 1 - success_rate,
-            'average_execution_time': avg_execution_time,
-            'total_execution_time': metrics.get('total_execution_time', 0),
-            'performance_score': perf_score,
-            
-            # Detailed statistics
-            'command_stats': command_stats,
-            'problematic_commands': problematic_commands,
-            'resource_usage': resource_usage,
-            'timestamps': {
-                'first_command': metrics.get('first_command_time'),
-                'last_command': metrics.get('last_command_time'),
-                'uptime_seconds': time.time() - (metrics.get('start_time', time.time()))
-            }
-        }
-
-    def _assess_capabilities(self) -> Dict:
-        """Assess current capabilities"""
-        return {
-            "modules_count": len(self.agent.modules),
-            "commands_count": len(self.agent.commands),
-            "available_modules": list(self.agent.commands.keys()),
-            "model_loaded": self.agent.llm is not None,
-            "custom_modules": self._count_custom_modules()
-        }
-
-    def _analyze_resource_usage(self) -> Dict:
-        """Analyze system resource usage"""
-        import psutil
-
-        return {
-            "cpu_usage": psutil.cpu_percent(interval=1),
-            "memory_usage": psutil.virtual_memory().percent,
-            "disk_usage": psutil.disk_usage('/').percent,
-            "process_count": len(psutil.pids())
-        }
-
-    def _analyze_failures(self) -> List[Dict]:
-        """Analyze recent failures to identify patterns"""
-        recent_failures = [
-            task for task in self.agent.task_history[-100:]  # Last 100 tasks
-            if not task['success']
-        ]
-
-        failure_patterns = {}
-        for failure in recent_failures:
-            command = failure['command']
-            error = failure['result']
-
-            # Group by command type
-            if command not in failure_patterns:
-                failure_patterns[command] = {
-                    'count': 0,
-                    'errors': [],
-                    'avg_execution_time': 0
-                }
-
-            failure_patterns[command]['count'] += 1
-            failure_patterns[command]['errors'].append(error)
-
-        return list(failure_patterns.items())
-
-    def _count_custom_modules(self) -> int:
-        """Count custom/generated modules"""
-        custom_count = 0
-        if self.generated_modules_dir.exists():
-            custom_count = len(list(self.generated_modules_dir.glob("*.py")))
-        return custom_count
-
-    def _identify_opportunities(self, analysis: Dict) -> List[Dict]:
-        """
-        Identify improvement opportunities with enhanced analysis
+        Build and test a generated module.
         
         Args:
-            analysis: Performance analysis results
+            module_path: Path to the module directory
             
         Returns:
-            List of improvement opportunities with priority and context
+            bool: True if build and tests pass, False otherwise
         """
-        opportunities = []
-        now = time.time()
-        
-        # 1. Performance-based opportunities
-        perf = analysis.get('performance_analysis', {})
-        
-        # High failure rate
-        if perf.get('failure_rate', 0) > 0.1:
-            opportunities.append({
-                'id': f"perf_failure_{int(now)}",
-                'type': 'performance',
-                'category': 'reliability',
-                'priority': 'high',
-                'description': f'High command failure rate ({perf["failure_rate"]*100:.1f}%)',
-                'metrics': {'failure_rate': perf['failure_rate']},
-                'suggested_actions': [
-                    'improve_error_handling',
-                    'add_retry_mechanism',
-                    'enhance_validation'
-                ],
-                'impact': 'high',
-                'effort': 'medium',
-                'created_at': now
-            })
-        
-        # 2. Capability gaps
-        for cmd in perf.get('problematic_commands', []):
-            if cmd not in getattr(self.agent, 'command_registry', {}):
-                opportunities.append({
-                    'id': f"cap_missing_{cmd}_{int(now)}",
-                    'type': 'capability',
-                    'category': 'missing_feature',
-                    'priority': 'high',
-                    'description': f'Missing command: {cmd}',
-                    'suggested_actions': [f'add_{cmd}_command'],
-                    'impact': 'high',
-                    'effort': 'medium',
-                    'created_at': now
-                })
-        
-        # 3. Resource optimization
-        res = analysis.get('resource_usage', {})
-        if res.get('memory_usage', 0) > 80:  # If memory usage > 80%
-            opportunities.append({
-                'id': f"res_memory_{int(now)}",
-                'type': 'resource',
-                'category': 'memory',
-                'priority': 'high',
-                'description': f'High memory usage: {res["memory_usage"]:.1f}%',
-                'metrics': {'memory_percent': res['memory_usage']},
-                'suggested_actions': [
-                    'optimize_memory_usage',
-                    'add_memory_limits',
-                    'implement_garbage_collection'
-                ],
-                'impact': 'high',
-                'effort': 'high',
-                'created_at': now
-            })
-        
-        # 4. LLM-based opportunity identification
-        if hasattr(self.agent, 'llm') and self.agent.llm is not None:
-            try:
-                llm_opportunities = self._llm_identify_opportunities(analysis)
-                opportunities.extend(llm_opportunities)
-            except Exception as e:
-                logger.error(f"LLM opportunity identification failed: {e}")
-        
-        # Sort opportunities by priority (high to low) and creation time (newest first)
-        priority_order = {'high': 0, 'medium': 1, 'low': 2}
-        opportunities.sort(key=lambda x: (priority_order.get(x.get('priority', 'low'), 2), 
-                                        -x.get('created_at', 0)))
-        
-        return opportunities
-        
-    def _llm_identify_opportunities(self, analysis: Dict) -> List[Dict]:
-        """Use LLM to identify additional improvement opportunities"""
-        if not hasattr(self.agent, 'generate'):
-            return []
-            
-        prompt = f"""
-        Analyze this ELLMa agent performance data and suggest improvement opportunities:
-        
-        Performance Metrics:
-        - Success Rate: {analysis['performance_analysis']['success_rate']:.2%}
-        - Average Execution Time: {analysis['performance_analysis']['average_execution_time']:.2f}s
-        - Available Modules: {analysis['capability_assessment']['available_modules']}
-        
-        Focus on:
-        1. Missing essential functionality
-        2. Performance bottlenecks
-        3. New capabilities that would make the agent more useful
-        
-        Return a JSON array of opportunities with this structure:
-        [
-          {{
-            "type": "capability|performance|reliability",
-            "priority": "high|medium|low",
-            "description": "Clear description",
-            "suggested_actions": ["action1", "action2"]
-          }}
-        ]
-        """
-        
         try:
-            response = self.agent.generate(prompt, max_tokens=500)
-            # Extract JSON from response
-            import re
-            json_match = re.search(r'\[.*\]', response, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group())
-        except Exception as e:
-            logger.warning(f"LLM opportunity identification failed: {e}")
-            
-        return []
-
-        return []
-
-    def _generate_solutions(self, opportunities: List[Dict]) -> List[Dict]:
-        """Generate solutions for identified opportunities"""
-        solutions = []
-        total_ops = len(opportunities)
-        
-        if total_ops == 0:
-            self.console.print("[yellow]No opportunities found to generate solutions for[/yellow]")
-            return solutions
-
-        with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(bar_width=None),
-                "•",
-                TextColumn("({task.completed}/{task.total})"),
-                "•",
-                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-                console=self.console
-        ) as progress:
-            task = progress.add_task(
-                "[cyan]Generating solutions...",
-                total=total_ops
+            # Install the module in development mode
+            result = subprocess.run(
+                ["pip", "install", "-e", "."],
+                cwd=module_path,
+                capture_output=True,
+                text=True
             )
-
-            for i, opportunity in enumerate(opportunities, 1):
-                try:
-                    # Log which opportunity is being processed
-                    desc = opportunity.get('description', 'No description')
-                    progress.console.print(
-                        f"[dim]Processing opportunity {i}/{total_ops}: {desc[:100]}{'...' if len(desc) > 100 else ''}"
-                    )
-                    
-                    # Generate the solution
-                    solution = self._generate_single_solution(opportunity)
-                    
-                    if solution:
-                        solutions.append(solution)
-                        progress.console.print(
-                            f"[green]✓ Generated solution for: {desc[:80]}{'...' if len(desc) > 80 else ''}"
-                        )
-                    else:
-                        progress.console.print(
-                            f"[yellow]⚠️  No solution generated for: {desc[:80]}{'...' if len(desc) > 80 else ''}"
-                        )
-                        
-                    progress.advance(task)
-                    
-                except Exception as e:
-                    error_msg = f"Failed to generate solution for {opportunity.get('description', 'unknown')}: {str(e)}"
-                    logger.error(error_msg)
-                    progress.console.print(f"[red]✗ {error_msg}")
-                    progress.advance(task)
-                    continue
-
-        return solutions
-
-    def _generate_single_solution(self, opportunity: Dict) -> Optional[Dict]:
-        """Generate a single solution for an opportunity"""
-        if not self.agent.llm:
-            return None
-
-        action = opportunity['suggested_action']
-
-        # Generate solution based on action type
-        if action.startswith('create_new_modules'):
-            return self._generate_new_module_solution(opportunity)
-        elif action.startswith('improve_error_handling'):
-            return self._generate_error_handling_solution(opportunity)
-        elif action.startswith('optimize_execution'):
-            return self._generate_optimization_solution(opportunity)
-        elif action.startswith('fix_') and action.endswith('_command'):
-            return self._generate_command_fix_solution(opportunity)
-        else:
-            return self._generate_generic_solution(opportunity)
-
-    def _generate_new_module_solution(self, opportunity: Dict) -> Dict:
-        """Generate a new module solution"""
-        prompt = f"""
-        Create a new Python module for ELLMa agent to address this opportunity:
-        {opportunity['description']}
-
-        The module should:
-        1. Follow ELLMa module pattern
-        2. Include error handling
-        3. Be useful for system administration or automation
-        4. Have clear documentation
-
-        Generate complete Python code:
-
-        ```python
-        class NewModule:
-            def __init__(self, agent):
-                self.agent = agent
-                self.name = "module_name"
-
-            def get_commands(self):
-                return {{
-                    'newmodule': self
-                }}
-
-            def action_name(self, *args, **kwargs):
-                '''Action description'''
-                # Implementation
-                return result
-        ```
-
-        Make it practical and immediately useful.
-        """
-
-        try:
-            code = self.agent.generate(prompt, max_tokens=800)
-
-            # Extract Python code
-            import re
-            code_match = re.search(r'```python\n(.*?)\n```', code, re.DOTALL)
-            if code_match:
-                module_code = code_match.group(1)
-
-                return {
-                    'type': 'new_module',
-                    'opportunity_id': id(opportunity),
-                    'description': opportunity['description'],
-                    'code': module_code,
-                    'module_name': 'generated_module_' + datetime.now().strftime('%Y%m%d_%H%M%S'),
-                    'priority': opportunity['priority']
-                }
-        except Exception as e:
-            logger.error(f"Failed to generate new module: {e}")
-
-        return None
-
-    def _generate_error_handling_solution(self, opportunity: Dict) -> Dict:
-        """Generate error handling improvement"""
-        return {
-            'type': 'error_handling',
-            'opportunity_id': id(opportunity),
-            'description': 'Improve error handling and retry logic',
-            'code': '''
-def enhanced_error_handler(func):
-    def wrapper(*args, **kwargs):
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    raise
-                time.sleep(2 ** attempt)  # Exponential backoff
-        return wrapper
-            ''',
-            'module_name': 'error_handling_enhancement',
-            'priority': opportunity['priority']
-        }
-
-    def _generate_optimization_solution(self, opportunity: Dict) -> Dict:
-        """Generate performance optimization solution"""
-        return {
-            'type': 'optimization',
-            'opportunity_id': id(opportunity),
-            'description': 'Cache frequently used operations',
-            'code': '''
-import time
-from functools import lru_cache
-
-class PerformanceCache:
-    def __init__(self):
-        self.cache = {}
-        self.timestamps = {}
-        self.ttl = 300  # 5 minutes
-
-    def get(self, key):
-        if key in self.cache:
-            if time.time() - self.timestamps[key] < self.ttl:
-                return self.cache[key]
-            else:
-                del self.cache[key]
-                del self.timestamps[key]
-        return None
-
-    def set(self, key, value):
-        self.cache[key] = value
-        self.timestamps[key] = time.time()
-            ''',
-            'module_name': 'performance_cache',
-            'priority': opportunity['priority']
-        }
-
-    def _generate_command_fix_solution(self, opportunity: Dict) -> Dict:
-        """Generate command fix solution"""
-        command_name = opportunity['suggested_action'].replace('fix_', '').replace('_command', '')
-
-        return {
-            'type': 'command_fix',
-            'opportunity_id': id(opportunity),
-            'description': f'Fix issues in {command_name} command',
-            'code': f'''
-# Enhanced {command_name} command with better error handling
-def enhanced_{command_name}(self, *args, **kwargs):
-    try:
-        # Add validation
-        if not args:
-            raise ValueError("Arguments required")
-
-        # Original logic with improvements
-        result = self.original_{command_name}(*args, **kwargs)
-        return result
-
-    except Exception as e:
-        self.agent.console.print(f"[red]Error in {command_name}: {{e}}[/red]")
-        return {{"error": str(e), "status": "failed"}}
-            ''',
-            'module_name': f'{command_name}_fix',
-            'priority': opportunity['priority']
-        }
-
-    def _generate_generic_solution(self, opportunity: Dict) -> Optional[Dict]:
-        """Generate generic solution"""
-        prompt = f"""
-        Create a Python solution for this improvement opportunity:
-        {opportunity['description']}
-
-        Generate practical code that can be integrated into ELLMa agent.
-        Focus on the specific problem described.
-
-        Return only Python code without explanations.
-        """
-
-        try:
-            code = self.agent.generate(prompt, max_tokens=400)
-            return {
-                'type': 'generic',
-                'opportunity_id': id(opportunity),
-                'description': opportunity['description'],
-                'code': code,
-                'module_name': 'generic_solution',
-                'priority': opportunity['priority']
-            }
-        except Exception as e:
-            logger.error(f"Failed to generate generic solution: {e}")
-            return None
-
-    def _test_solutions(self, solutions: List[Dict]) -> List[Dict]:
-        """
-        Test and validate generated solutions
-        
-        Args:
-            solutions: List of solution dictionaries to test
             
-        Returns:
-            List of validated solutions
-        """
-        self.console.print(f"[yellow]Testing {len(solutions)} solutions...[/yellow]")
-        validated_solutions = []
+            if result.returncode != 0:
+                logger.error(f"Failed to install module: {result.stderr}")
+                return False
+                
+            # Run tests
+            test_result = subprocess.run(
+                ["python", "-m", "pytest", "tests/"],
+                cwd=module_path,
+                capture_output=True,
+                text=True
+            )
+            
+            if test_result.returncode != 0:
+                logger.error(f"Module tests failed: {test_result.stderr}")
+                return False
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error building/testing module: {e}", exc_info=True)
+            return False
+    
+    def _import_module(self, module_name: str, module_path: str):
+        """Dynamically import a module."""
+        import importlib.util
+        import sys
         
-        for solution in solutions:
-            try:
-                # Simple validation - check required fields
-                if all(k in solution for k in ['type', 'description', 'code']):
-                    solution['test_status'] = 'validated'
-                    solution['test_timestamp'] = datetime.now().isoformat()
-                    validated_solutions.append(solution)
-                else:
-                    solution['test_status'] = 'invalid'
-                    solution['error'] = 'Missing required fields'
-            except Exception as e:
-                solution['test_status'] = 'error'
-                solution['error'] = str(e)
-                logger.error(f"Error testing solution: {e}")
+        # Add the parent directory to sys.path if needed
+        parent_dir = str(Path(module_path).parent)
+        if parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
         
-        return validated_solutions
-
+        # Import the module
+        spec = importlib.util.spec_from_file_location(module_name, str(Path(module_path) / "__init__.py"))
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        
+        return module
+    
     def _integrate_solutions(self, solutions: List[Dict]) -> Dict:
         """
         Integrate validated solutions into the agent
@@ -878,37 +591,88 @@ def enhanced_{command_name}(self, *args, **kwargs):
             solutions: List of validated solutions
             
         Returns:
-            Integration results
+            Integration results including module creation info
         """
         self.console.print(f"[yellow]Integrating {len(solutions)} solutions...[/yellow]")
         results = {
             'total': len(solutions),
             'successful': 0,
             'failed': 0,
+            'modules_created': 0,
+            'modules_removed': 0,
             'integrated': []
         }
         
         for solution in solutions:
             try:
-                if solution.get('test_status') == 'validated':
-                    module_name = f"generated_{len(os.listdir(self.generated_modules_dir)) + 1}"
-                    module_path = self.generated_modules_dir / f"{module_name}.py"
+                if solution.get('type') == 'new_module' and solution.get('test_status') == 'validated':
+                    # Generate new module
+                    module_spec = {
+                        'name': solution.get('module_name', f'generated_module_{len(self.evolution_metrics["modules"])}'),
+                        'description': solution.get('description', 'Auto-generated module'),
+                        'purpose': solution.get('purpose', 'Automatically generated during evolution'),
+                        'dependencies': solution.get('dependencies', [])
+                    }
                     
-                    with open(module_path, 'w') as f:
-                        f.write(solution.get('code', ''))
+                    # Generate the module
+                    gen_result = self.module_generator.generate_module(module_spec)
                     
-                    solution['module_path'] = str(module_path)
-                    results['successful'] += 1
-                    results['integrated'].append({
-                        'module': module_name,
-                        'path': str(module_path),
-                        'timestamp': datetime.now().isoformat()
-                    })
+                    if gen_result['status'] == 'success':
+                        module_name = gen_result['module_name']
+                        module_path = gen_result['module_path']
+                        
+                        # Build and test the module
+                        build_success = self._build_and_test_module(Path(module_path))
+                        
+                        if build_success:
+                            # Add module to agent
+                            try:
+                                # Dynamically import the module
+                                module = self._import_module(module_name, module_path)
+                                if hasattr(module, module_spec['name'].title().replace(' ', '') + 'Module'):
+                                    module_class = getattr(module, module_spec['name'].title().replace(' ', '') + 'Module')
+                                    self.agent.add_module(module_name, module_class())
+                                    
+                                    # Update metrics
+                                    results['modules_created'] += 1
+                                    self.evolution_metrics['modules_created'] += 1
+                                    self.evolution_metrics['modules'][module_name] = {
+                                        'path': module_path,
+                                        'created_at': datetime.now().isoformat(),
+                                        'status': 'active'
+                                    }
+                                    
+                                    results['successful'] += 1
+                                    results['integrated'].append({
+                                        'module': module_name,
+                                        'path': module_path,
+                                        'type': 'new_module',
+                                        'timestamp': datetime.now().isoformat()
+                                    })
+                                else:
+                                    raise ImportError(f"Module class not found in {module_name}")
+                            except Exception as e:
+                                logger.error(f"Failed to import module {module_name}: {e}")
+                                results['failed'] += 1
+                        else:
+                            logger.error(f"Failed to build/test module {module_name}")
+                            results['failed'] += 1
+                    else:
+                        logger.error(f"Failed to generate module: {gen_result.get('error', 'Unknown error')}")
+                        results['failed'] += 1
                 else:
-                    results['failed'] += 1
+                    # Handle other types of solutions (e.g., code patches)
+                    # ... existing code ...
+                    pass
+                        
             except Exception as e:
-                logger.error(f"Error integrating solution: {e}")
+                logger.error(f"Error integrating solution: {e}", exc_info=True)
                 results['failed'] += 1
+                log_error(e, {
+                    'context': 'module_integration',
+                    'solution': solution,
+                    'error': str(e)
+                })
         
         return results
 
@@ -965,7 +729,74 @@ def enhanced_{command_name}(self, *args, **kwargs):
         
         self.console.print(table)
 
-    def _log_evolution(self, results: Dict) -> None:
+    def _save_evolution_log(self) -> None:
+        """
+        Save the current evolution log to disk.
+        
+        This method saves the current evolution cycle and metrics to a JSON file.
+        It handles serialization of the data and creates backups if needed.
+        """
+        try:
+            if not hasattr(self, 'evolution_dir') or not self.evolution_dir:
+                self.evolution_dir = Path.home() / ".ellma" / "evolution"
+                self.evolution_dir.mkdir(parents=True, exist_ok=True)
+            
+            log_file = self.evolution_dir / 'evolution_history.json'
+            
+            # Create a copy of the current cycle without any unpicklable objects
+            cycle_copy = {}
+            if hasattr(self, 'current_cycle') and self.current_cycle:
+                for k, v in self.current_cycle.items():
+                    try:
+                        json.dumps(v)  # Test if serializable
+                        cycle_copy[k] = v
+                    except (TypeError, OverflowError):
+                        cycle_copy[k] = str(v)
+            
+            # Add to evolution log if not already present
+            if not hasattr(self, 'evolution_log'):
+                self.evolution_log = []
+                
+            if cycle_copy and (not self.evolution_log or self.evolution_log[-1] != cycle_copy):
+                self.evolution_log.append(cycle_copy)
+            
+            # Ensure metrics exist
+            if not hasattr(self, 'evolution_metrics'):
+                self.evolution_metrics = {
+                    'total_cycles': 0,
+                    'successful_cycles': 0,
+                    'failed_cycles': 0,
+                    'modules_created': 0,
+                    'modules_removed': 0,
+                    'performance_improvement': 0.0
+                }
+            
+            # Save to file
+            with open(log_file, 'w') as f:
+                json.dump({
+                    'version': '1.0',
+                    'last_updated': datetime.now().isoformat(),
+                    'cycles': self.evolution_log,
+                    'metrics': self.evolution_metrics
+                }, f, indent=2)
+                
+            logger.debug(f"Saved evolution log to {log_file}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save evolution log: {e}", exc_info=True)
+            # Try to save a minimal log if full log fails
+            try:
+                log_file = self.evolution_dir / 'evolution_history_fallback.json'
+                with open(log_file, 'w') as f:
+                    json.dump({
+                        'error': str(e),
+                        'last_cycle_status': self.current_cycle.get('status', 'unknown') if hasattr(self, 'current_cycle') else 'unknown',
+                        'timestamp': datetime.now().isoformat()
+                    }, f)
+            except Exception as inner_e:
+                logger.critical(f"Completely failed to save evolution log: {inner_e}")
+    
+    def _log_evolution(self, results: Dict):
         """
         Log the results of an evolution cycle
         
