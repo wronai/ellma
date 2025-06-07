@@ -209,19 +209,27 @@ if __name__ == "__main__":
         # Create __init__.py in tests directory
         (tests_dir / "__init__.py").write_text("""Test package for the module.""")
         
-        # Create test file
-        test_content = f"""Test cases for {spec['name']}."""
+        # Create test file content with proper indentation and string formatting
+        test_content = f"""\"\"\"
+Test cases for {spec['name']}.
+\"\"\"
 
 import unittest
 from {module_name} import main
 
 class TestMain(unittest.TestCase):
-    """Test cases for the main module."""
+    \"\"\"
+    Test cases for the main module.
+    \"\"\"
     
     def test_placeholder(self):
-        """Placeholder test."""
+        \"\"\"
+        Placeholder test.
+        \"\"\"
         self.assertTrue(True)
 
+if __name__ == "__main__":
+    unittest.main()
 """
         
         # Write test file

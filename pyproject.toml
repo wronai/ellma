@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ellma"
-version = "0.1.9"
+version = "0.1.11"
 description = "Evolutionary Local LLM Agent - Self-improving AI assistant"
 authors = ["Tom Sapletta <info@softreck.dev>"]
 maintainers = ["WRONAI Team <contact@wronai.dev>"]
