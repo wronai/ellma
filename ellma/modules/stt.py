@@ -14,12 +14,44 @@ from dataclasses import dataclass
 from enum import Enum
 from rich.console import Console
 
+# Define dummy classes first for fallback
+class DummyAudioData:
+    def __init__(self, *args, **kwargs):
+        pass
+    def get_wav_data(self, *args, **kwargs):
+        return b''
+
+class DummyRecognizer:
+    def __init__(self, *args, **kwargs):
+        pass
+    def recognize_google(self, *args, **kwargs):
+        raise ImportError("speech_recognition module not installed")
+    def recognize_sphinx(self, *args, **kwargs):
+        raise ImportError("speech_recognition module not installed")
+
+# Initialize sr as None
+sr = None
+SPEECH_RECOGNITION_AVAILABLE = False
+
 # Try to import speech recognition
 try:
-    import speech_recognition as sr
+    import speech_recognition as _sr
+    sr = _sr
+    # Create a dummy AudioData class if not available
+    if not hasattr(sr, 'AudioData'):
+        sr.AudioData = DummyAudioData
+    if not hasattr(sr, 'Recognizer'):
+        sr.Recognizer = DummyRecognizer
     SPEECH_RECOGNITION_AVAILABLE = True
 except ImportError:
+    # Create a dummy module-like object with the required attributes
+    class DummySR:
+        AudioData = DummyAudioData
+        Recognizer = DummyRecognizer
+    
+    sr = DummySR()
     SPEECH_RECOGNITION_AVAILABLE = False
+    sr = None  # Set sr to None if not available
 
 # Try to import whisper
 try:

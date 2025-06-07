@@ -27,6 +27,27 @@
 
 ELLMa is a revolutionary **self-evolving AI agent** that runs locally on your machine. Unlike traditional AI tools, ELLMa **learns and improves itself** with these key features:
 
+### 🔒 Security & Dependency Management
+
+- **Automatic Environment Setup**: Ensures all dependencies are installed and configured correctly
+- **Dependency Auto-Repair**: Automatically detects and fixes missing or broken dependencies
+- **Virtual Environment Management**: Handles Python virtual environments automatically
+- **Security Checks**: Performs security validations before executing commands
+- **Graceful Degradation**: Works even when optional dependencies are missing
+
+### 🛠 Commands
+
+```bash
+# Check environment status
+ellma security check
+
+# Install dependencies
+ellma security install [--group GROUP]
+
+# Repair environment issues
+ellma security repair
+```
+
 [![PyPI version](https://badge.fury.io/py/ellma.svg)](https://badge.fury.io/py/ellma)
 [![Python Support](https://img.shields.io/pypi/pyversions/ellma.svg)](https://pypi.org/project/ellma/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -73,6 +94,22 @@ These commands support natural language queries, so you can type things like:
 - "show me the config" → `sys config`
 - "what modules are available" → `sys modules`
 - "display system information" → `sys info`
+
+## 🛡️ Security First
+
+ELLMa includes a robust security layer that runs before any code execution to ensure a safe and consistent environment:
+
+1. **Environment Validation**: Verifies Python version, virtual environment, and dependencies
+2. **Auto-Repair**: Automatically installs missing dependencies when possible
+3. **Secure Execution**: Runs in an isolated environment with proper permissions
+4. **Dependency Management**: Uses Poetry for reliable dependency resolution
+
+### Security Features
+
+- **Dependency Isolation**: Each component runs with minimal required permissions
+- **Environment Sandboxing**: Critical operations run in isolated environments
+- **Secure Defaults**: Secure by default with sensible restrictions
+- **Audit Logging**: All security-relevant actions are logged
 
 ## ⚡ Quick Start
 

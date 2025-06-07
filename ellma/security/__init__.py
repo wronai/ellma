@@ -8,9 +8,24 @@ This module provides a security wrapper around ELLMa that handles:
 - Security checks
 """
 
+from .core import (
+    ensure_environment,
+    install_dependencies,
+    check_environment,
+    EnvironmentError,
+    DependencyError,
+    SecurityError,
+    EnvironmentStatus,
+    EnvironmentCheck
+)
+
 __all__ = [
     'ensure_environment',
     'install_dependencies',
     'check_environment',
     'EnvironmentError',
+    'DependencyError',
+    'SecurityError',
+    'EnvironmentStatus',
+    'EnvironmentCheck'
 ]

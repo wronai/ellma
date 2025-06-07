@@ -9,6 +9,19 @@ __author__ = "ELLMa Team"
 __email__ = "contact@ellma.dev"
 __license__ = "MIT"
 
+# Import security module early to ensure environment is properly set up
+# Skip checks if we're in setup.py or during package installation
+if not any('setup.py' in arg for arg in __import__('sys').argv):
+    try:
+        from ellma.security import ensure_environment
+        ensure_environment(auto_repair=True)
+    except ImportError as e:
+        import warnings
+        warnings.warn(f"Failed to initialize security module: {e}")
+    except Exception as e:
+        import warnings
+        warnings.warn(f"Error during security initialization: {e}")
+
 # Common exceptions first to avoid circular imports
 class ELLMaError(Exception):
     """Base exception for ELLMa"""

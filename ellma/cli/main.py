@@ -22,6 +22,13 @@ from ellma import __version__, BANNER
 from ellma.core.agent import ELLMa
 from ellma.utils.logger import get_logger, setup_logging
 
+# Import security commands
+try:
+    from ellma.security.cli import cli as security_cli
+except ImportError as e:
+    logger.warning(f"Failed to load security commands: {e}")
+    security_cli = None
+
 console = Console()
 logger = get_logger(__name__)
 
@@ -113,7 +120,11 @@ def init(ctx, force):
     console.print("2. [bold]ellma shell[/bold] - Start interactive shell")
     console.print("3. [bold]ellma exec 'system.scan'[/bold] - Test with a command")
 
+# Security commands
+if security_cli:
+    cli.add_command(security_cli, name="security")
 
+# Setup and configuration commands
 @cli.group()
 def setup():
     """Setup and configuration commands"""

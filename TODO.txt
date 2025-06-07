@@ -1,5 +1,17 @@
 # TODO - ELLMa Improvement Plan
 
+## Security and Dependency Management (2025-06-08)
+- [x] Implement core security module with environment validation
+- [x] Add automatic dependency installation and repair
+- [x] Create security CLI commands
+- [x] Implement virtual environment management
+- [x] Add security checks before code execution
+- [ ] Add more security validations (file permissions, network access)
+- [ ] Implement secure sandboxing for untrusted code
+- [ ] Add audit logging for security-relevant actions
+- [ ] Create security policy configuration
+- [ ] Implement dependency vulnerability scanning
+
 ## Error Handling and Evolution
 - [x] Create error logging system in ./TODO/ directory
 - [x] Track errors with full context for evolution
@@ -59,7 +71,14 @@ modules/
 - [ ] Document error codes and their meanings
 - [ ] Create video tutorials for key features
 
-## Recent Changes (2025-06-07)
+## Recent Changes (2025-06-08)
+- Implemented comprehensive security layer with auto-repair
+- Added dependency management with Poetry integration
+- Created secure shell wrapper for safe execution
+- Added environment validation and auto-setup
+- Implemented security CLI commands
+
+## Changes (2025-06-07)
 - Added system introspection module with natural language support
 - Implemented command mapping engine for natural language queries
 - Added rich console output for better readability
