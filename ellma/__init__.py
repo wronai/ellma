@@ -66,7 +66,7 @@ PACKAGE_INFO = {
     'author': __author__,
     'email': __email__,
     'license': __license__,
-    'url': 'https://github.com/ellma-ai/ellma',
+    'url': 'https://github.com/wronai/ellma',
     'keywords': ['llm', 'ai', 'agent', 'automation', 'evolution'],
 }
 

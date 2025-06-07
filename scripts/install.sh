@@ -513,7 +513,7 @@ ${CYAN}Useful Commands:${NC}
   ellma-activate              # Quick activation alias
 
 ${CYAN}Documentation:${NC}
-  GitHub: https://github.com/ellma-ai/ellma
+  GitHub: https://github.com/wronai/ellma
   Docs:   https://ellma.readthedocs.io/
 
 ${CYAN}Next Steps:${NC}

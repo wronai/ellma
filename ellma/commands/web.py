@@ -18,6 +18,7 @@ from urllib3.util.retry import Retry
 
 from ellma.commands.base import BaseCommand, validate_args, log_execution, timeout
 from ellma.utils.logger import get_logger
+from ellma.utils.error_logger import log_command_error
 
 logger = get_logger(__name__)
 
@@ -194,7 +195,7 @@ class WebCommands(BaseCommand):
         Read and extract content from a web page
 
         Args:
-            url (str): Target URL to read from
+            url (str): Target URL to read from (supports both full URLs and domain-only inputs)
             extract_text (bool, optional): Whether to extract clean text content. Defaults to True.
             extract_links (bool, optional): Whether to extract all links. Defaults to False.
 
@@ -210,8 +211,55 @@ class WebCommands(BaseCommand):
                 - language (str): Detected language of the page
                 - timestamp (str): ISO format timestamp of when the page was read
         """
+        # Add https:// if no scheme is provided
+        original_url = url
+        scheme_added = False
+        
+        if not url.startswith(('http://', 'https://')):
+            url = f'https://{url}'
+            scheme_added = True
+            logger.info(f"No scheme provided, using https:// - Full URL: {url}")
+        
         # Get the page
-        response_data = self.get(url)
+        response_data = None
+        try:
+            response_data = self.get(url)
+        except requests.exceptions.MissingSchema as e:
+            # If https:// fails, try with http://
+            if url.startswith('https://'):
+                http_url = url.replace('https://', 'http://', 1)
+                logger.info(f"HTTPS failed, trying HTTP - URL: {http_url}")
+                try:
+                    response_data = self.get(http_url)
+                except Exception as http_error:
+                    # Log both errors
+                    log_command_error(
+                        command=f"web.read('{original_url}')",
+                        error=e,
+                        context={
+                            'original_url': original_url,
+                            'modified_url': url,
+                            'scheme_added': scheme_added,
+                            'error_type': 'MissingSchema',
+                            'http_fallback_attempted': True,
+                            'http_fallback_error': str(http_error)
+                        }
+                    )
+                    raise http_error from e
+            else:
+                # Log the original error if no fallback was attempted
+                log_command_error(
+                    command=f"web.read('{original_url}')",
+                    error=e,
+                    context={
+                        'original_url': original_url,
+                        'modified_url': url,
+                        'scheme_added': scheme_added,
+                        'error_type': 'MissingSchema',
+                        'http_fallback_attempted': False
+                    }
+                )
+                raise e
 
         if response_data.get('status_code') != 200:
             return response_data

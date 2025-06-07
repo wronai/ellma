@@ -38,20 +38,6 @@ ELLMa is a revolutionary **self-evolving AI agent** that runs locally on your ma
 
 ### Core Capabilities
 
-- 🧬 **Self-Evolution**: Automatically generates new capabilities based on usage patterns
-- 🏠 **Local-First**: Runs entirely on your machine with complete privacy
-- 🐚 **Shell-Native**: Integrates seamlessly with your system and workflows
-- 🛠️ **Command Execution**: Executes commands in a structured format
-- 📦 **Modular**: Extensible architecture that grows with your needs
-- 🤖 **Multi-Model**: Supports various local LLM models
-- 🔄 **Auto-Improving**: Continuously learns from interactions
-
-### Technical Highlights
-
-- **Built-in Commands**: Wide range of system, web, and file operations
-- **Code Generation**: Generate Python, Bash, and Docker configurations
-- **Web Interaction**: Advanced web scraping and API interaction tools
-- **Plugin System**: Easy to extend with custom modules
 - **Performance Monitoring**: Built-in metrics and monitoring
 - **Cross-Platform**: Works on Linux, macOS, and Windows (WSL2 recommended for Windows)
 
@@ -466,10 +452,10 @@ ellma exec system.health
 ellma exec system.scan
 
 # Read web page content
-ellma exec web.read https://example.com
+ellma exec "web.read('https://example.com')"
 
 # Read web page with link extraction
-ellma exec "web.read('https://example.com', extract_links=True)"
+ellma exec "web.read('https://example.com', extract_links=True, extract_text=True)"
 
 # Quick system health check
 ellma exec system.health
@@ -489,13 +475,21 @@ ellma shell
 # In the shell, you can run commands like:
 ellma> system.health
 ellma> system.scan
-ellma> web.read https://example.com
+ellma> web.read('https://example.com')
+ellma> web.read('https://example.com', extract_links=True, extract_text=True)
 ```
 
 Example shell session:
 ```
 🤖 ELLMa Interactive Shell (v0.1.6)
 Type 'help' for available commands, 'exit' to quit
+
+# Available commands:
+# - system.health: Check system health
+# - system.scan: Perform system scan
+# - web.read('https://example.com'): Read web page content
+# - web.read('https://example.com', extract_links=True, extract_text=True): Read web page with link extraction
+# - help: Show available commands
 
 ellma> system.health
 {'status': 'HEALTHY', 'cpu_usage': 12.5, 'memory_usage': 45.2, ...}
@@ -734,7 +728,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ### Development Setup
 ```bash
 # Clone repository
-git clone https://github.com/ellma-ai/ellma.git
+git clone https://github.com/wronai/ellma.git
 cd ellma
 
 # Install in development mode
@@ -761,8 +755,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - 📖 [Documentation](https://ellma.readthedocs.io/)
-- 🐛 [Issue Tracker](https://github.com/ellma-ai/ellma/issues)
-- 💬 [Discussions](https://github.com/ellma-ai/ellma/discussions)
+- 🐛 [Issue Tracker](https://github.com/wronai/ellma/issues)
+- 💬 [Discussions](https://github.com/wronai/ellma/discussions)
 - 📧 [Email Support](mailto:support@ellma.dev)
 
 ---

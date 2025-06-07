@@ -11,8 +11,10 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional, Callable, Union
 from datetime import datetime
 from functools import wraps
+from typing import Dict, Any, Optional, Type, TypeVar
 
 from ellma.utils.logger import get_logger
+from ellma.utils.error_logger import log_command_error
 
 logger = get_logger(__name__)
 
@@ -102,19 +104,32 @@ def log_execution(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         start_time = time.time()
-        command_name = f"{self.__class__.__name__}.{func.__name__}"
-
-        logger.info(f"Executing command: {command_name}")
-        logger.debug(f"Arguments: args={args}, kwargs={kwargs}")
+        self.logger.info(f"Executing {func.__name__}")
 
         try:
             result = func(self, *args, **kwargs)
-            duration = time.time() - start_time
-            logger.info(f"Command {command_name} completed in {duration:.3f}s")
+            execution_time = time.time() - start_time
+            self.logger.info(f"Command {func.__name__} completed in {execution_time:.3f}s")
             return result
         except Exception as e:
-            duration = time.time() - start_time
-            logger.error(f"Command {command_name} failed after {duration:.3f}s: {e}")
+            execution_time = time.time() - start_time
+            self.logger.error(f"Command {func.__name__} failed after {execution_time:.3f}s: {e}", exc_info=True)
+            
+            # Log to TODO file with additional context
+            context = {
+                'command': f"{getattr(self, 'name', self.__class__.__name__)}.{func.__name__}",
+                'execution_time': f"{execution_time:.3f}s",
+                'error_type': e.__class__.__name__,
+                'error_details': str(e),
+                'args': str(args),
+                'kwargs': str(kwargs),
+            }
+            
+            log_command_error(
+                command=context['command'],
+                error=e,
+                context=context
+            )
             raise
 
     return wrapper
@@ -380,14 +395,34 @@ class BaseCommand(ABC):
 
     def __call__(self, action: str, *args, **kwargs):
         """Make command callable with action name"""
-        if not hasattr(self, action):
-            raise CommandError(f"Action '{action}' not found in command '{self.name}'")
+        try:
+            if not hasattr(self, action):
+                raise CommandError(f"Unknown action: {action}")
 
-        method = getattr(self, action)
-        if not callable(method) or action.startswith('_'):
-            raise CommandError(f"Action '{action}' is not callable")
+            method = getattr(self, action)
+            if not callable(method):
+                raise CommandError(f"{action} is not callable")
 
-        return method(*args, **kwargs)
+            return method(*args, **kwargs)
+        except Exception as e:
+            # Log the error to TODO file
+            context = {
+                'command': f"{self.name}.{action}",
+                'args': str(args),
+                'kwargs': str(kwargs),
+                'error_type': e.__class__.__name__,
+            }
+            
+            # Include more context for specific error types
+            if isinstance(e, (CommandValidationError, CommandExecutionError, CommandTimeoutError)):
+                context['error_details'] = str(e)
+            
+            log_command_error(
+                command=f"{self.name}.{action}",
+                error=e,
+                context=context
+            )
+            raise
 
 
 class SimpleCommand(BaseCommand):

@@ -26,7 +26,7 @@ Thank you for your interest in contributing to ELLMa! This document provides gui
 
 ```bash
 # Clone the repository
-git clone https://github.com/ellma-ai/ellma.git
+git clone https://github.com/wronai/ellma.git
 cd ellma
 
 # Create virtual environment
