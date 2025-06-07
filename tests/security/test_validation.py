@@ -43,11 +43,9 @@ else:
     # Define empty test constants if dependencies are missing
     TEST_SEVERITY_LEVELS = []
 
+@pytest.mark.skipif(not HAS_DEPENDENCIES, reason="Missing required dependencies")
 def test_check_file_permissions_secure(tmp_path):
     """Test checking secure file permissions."""
-    if not HAS_DEPENDENCIES:
-        pytest.skip("Missing required dependencies")
-        
     # Create a test file with secure permissions
     test_file = tmp_path / "secure_file.txt"
     test_file.write_text("test")
@@ -58,7 +56,38 @@ def test_check_file_permissions_secure(tmp_path):
     assert len(validator.get_findings()) == 0
 
 
-@pytest.mark.skipif(SKIP_NETWORK_TESTS, reason="Network tests disabled by default")
+@pytest.mark.skipif(not HAS_DEPENDENCIES, reason="Missing required dependencies")
+def test_check_file_permissions_insecure(tmp_path):
+    """Test checking insecure file permissions."""
+    # Create a test file with insecure permissions
+    test_file = tmp_path / "insecure_file.txt"
+    test_file.write_text("test")
+    test_file.chmod(0o666)  # rw-rw-rw-
+    
+    validator = SecurityValidator()
+    assert validator.check_file_permissions(test_file, max_permissions=0o600) is False
+    
+    findings = validator.get_findings()
+    assert len(findings) == 1
+    assert findings[0].severity == SecurityCheckSeverity.HIGH
+    assert "insecure_file_permissions" in findings[0].check_name
+
+
+@pytest.mark.skipif(not HAS_DEPENDENCIES, reason="Missing required dependencies")
+def test_check_directory_permissions_secure(tmp_path):
+    """Test checking secure directory permissions."""
+    # Create a test directory with secure permissions
+    test_dir = tmp_path / "secure_dir"
+    test_dir.mkdir()
+    test_dir.chmod(0o750)  # rwxr-x---
+    
+    validator = SecurityValidator()
+    assert validator.check_directory_permissions(test_dir) is True
+    assert len(validator.get_findings()) == 0
+
+
+@pytest.mark.skipif(not HAS_DEPENDENCIES or SKIP_NETWORK_TESTS, 
+                  reason="Missing dependencies or network tests disabled")
 def test_check_network_access_allowed():
     """Test checking allowed network access."""
     validator = SecurityValidator()
@@ -77,7 +106,8 @@ def test_check_network_access_allowed():
         assert len(validator.get_findings()) == 0
 
 
-@pytest.mark.skipif(SKIP_NETWORK_TESTS, reason="Network tests disabled by default")
+@pytest.mark.skipif(not HAS_DEPENDENCIES or SKIP_NETWORK_TESTS,
+                  reason="Missing dependencies or network tests disabled")
 def test_check_network_access_unauthorized():
     """Test checking unauthorized network access."""
     validator = SecurityValidator()
@@ -95,6 +125,7 @@ def test_check_network_access_unauthorized():
     assert "unauthorized_network_access" in findings[0].check_name
 
 
+@pytest.mark.skipif(not HAS_DEPENDENCIES, reason="Missing required dependencies")
 def test_validate_environment(tmp_path):
     """Test the full environment validation."""
     # Create a test project structure
@@ -120,6 +151,7 @@ def test_validate_environment(tmp_path):
     assert len(validator.get_findings()) == 0
 
 
+@pytest.mark.skipif(not HAS_DEPENDENCIES, reason="Missing required dependencies")
 def test_validate_environment_insecure(tmp_path):
     """Test environment validation with insecure permissions."""
     # Create test files with insecure permissions
