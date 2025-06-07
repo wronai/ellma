@@ -560,3 +560,30 @@ def enhanced_{command_name}(self, *args, **kwargs):
             logger.error(f"Failed to generate generic solution: {e}")
 
         return None
+        
+    def _log_evolution(self, results: Dict) -> None:
+        """
+        Log the results of an evolution cycle
+        
+        Args:
+            results: Dictionary containing evolution results
+        """
+        try:
+            # Add to in-memory log
+            self.evolution_log.append(results)
+            
+            # Save to file
+            history_file = self.evolution_dir / "evolution_history.json"
+            
+            # Ensure directory exists
+            history_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Write to file (pretty-printed JSON)
+            with open(history_file, 'w') as f:
+                json.dump(self.evolution_log, f, indent=2, default=str)
+                
+            logger.info(f"Logged evolution cycle {results.get('evolution_id', 'unknown')} to {history_file}")
+            
+        except Exception as e:
+            logger.error(f"Failed to log evolution results: {e}")
+            raise
