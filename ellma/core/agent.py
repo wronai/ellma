@@ -349,6 +349,71 @@ class ELLMa:
 
             raise CommandError(f"Command execution failed: {e}")
 
+    def _parse_command_args(self, command_args: str) -> tuple[list, dict]:
+        """Parse command line arguments into positional and keyword arguments
+        
+        Args:
+            command_args: Raw command arguments as string
+            
+        Returns:
+            tuple: (positional_args, keyword_args)
+        """
+        import shlex
+        from typing import List, Dict, Any
+        
+        if not command_args.strip():
+            return [], {}
+            
+        # Parse arguments using shlex to handle quoted strings properly
+        try:
+            args = shlex.split(command_args)
+        except ValueError as e:
+            raise CommandError(f"Error parsing arguments: {e}")
+        
+        positional = []
+        keyword_args = {}
+        i = 0
+        
+        while i < len(args):
+            arg = args[i]
+            if arg.startswith('--'):
+                # Handle --flag=value or --flag value
+                if '=' in arg:
+                    key, value = arg[2:].split('=', 1)
+                    keyword_args[key.replace('-', '_')] = self._convert_arg_value(value)
+                else:
+                    key = arg[2:].replace('-', '_')
+                    # Check if next arg is a value (not another flag)
+                    if i + 1 < len(args) and not args[i + 1].startswith('--'):
+                        keyword_args[key] = self._convert_arg_value(args[i + 1])
+                        i += 1  # Skip the next argument
+                    else:
+                        # Boolean flag (present = True)
+                        keyword_args[key] = True
+            else:
+                positional.append(self._convert_arg_value(arg))
+            i += 1
+            
+        return positional, keyword_args
+        
+    def _convert_arg_value(self, value: str) -> Any:
+        """Convert string argument to appropriate Python type"""
+        if value.lower() == 'true':
+            return True
+        if value.lower() == 'false':
+            return False
+        if value.lower() == 'none' or value.lower() == 'null':
+            return None
+            
+        # Try to convert to int or float
+        try:
+            return int(value)
+        except ValueError:
+            try:
+                return float(value)
+            except ValueError:
+                return value
+    
     def _execute_structured_command(self, command: str, *args, **kwargs) -> Any:
         """Execute structured command (module.action format)"""
         # Split command into parts and arguments
@@ -374,9 +439,13 @@ class ELLMa:
         # Get the method
         method = getattr(module, action)
         
-        # If there are command line arguments, pass them as a single string
+        # Parse command line arguments
         if command_args:
-            return method(command_args, *args, **kwargs)
+            positional_args, keyword_args = self._parse_command_args(command_args)
+            # Update kwargs with parsed keyword arguments
+            kwargs.update(keyword_args)
+            return method(*positional_args, **kwargs)
+            
         return method(*args, **kwargs)
 
     def _execute_natural_command(self, command: str, *args, **kwargs) -> Any:

@@ -3,102 +3,29 @@ ELLMa File Commands - File and Directory Operations
 
 This module provides comprehensive file and directory operations including
 reading, writing, analysis, searching, and batch processing capabilities.
+
+Note: This module has been refactored into smaller, more maintainable modules.
+The original interface is maintained for backward compatibility, but new code
+should import from the specific submodules directly.
 """
 
-import os
-import re
-import hashlib
-import mimetypes
-import subprocess
-import shutil
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Union, Generator
-from datetime import datetime, timedelta
-import fnmatch
-import json
-import stat
+import warnings
 
-from ellma.commands.base import BaseCommand, validate_args, log_execution, timeout
-from ellma.utils.logger import get_logger
+# Import the new implementation
+from .files import FileCommands as _FileCommands
 
-logger = get_logger(__name__)
+# Issue deprecation warning
+warnings.warn(
+    "The files module has been refactored. Import from ellma.commands.files instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
-class FileCommands(BaseCommand):
-    """
-    File Commands Module
+# Maintain the same interface for backward compatibility
+FileCommands = _FileCommands
 
-    Provides comprehensive file and directory operations including:
-    - File reading and writing
-    - Directory traversal and analysis
-    - File searching and pattern matching
-    - Batch operations
-    - Content analysis and extraction
-    """
-
-    def __init__(self, agent):
-        """Initialize File Commands"""
-        super().__init__(agent)
-        self.name = "files"
-        self.description = "File and directory operations"
-
-        # File operation settings
-        self.max_file_size = 100 * 1024 * 1024  # 100MB default limit
-        self.text_extensions = {'.txt', '.md', '.py', '.js', '.html', '.css', '.json', '.yaml', '.yml', '.xml', '.csv'}
-        self.binary_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.pdf', '.zip', '.tar', '.gz', '.exe', '.bin'}
-
-    @validate_args(str)
-    @log_execution
-    def read(self, file_path: str, encoding: str = 'utf-8', max_lines: Optional[int] = None) -> Dict[str, Any]:
-        """
-        Read file content
-
-        Args:
-            file_path: Path to file
-            encoding: File encoding
-            max_lines: Maximum lines to read
-
-        Returns:
-            File content and metadata
-        """
-        path = Path(file_path).expanduser()
-
-        if not path.exists():
-            return {'error': f'File not found: {file_path}'}
-
-        if not path.is_file():
-            return {'error': f'Path is not a file: {file_path}'}
-
-        # Check file size
-        file_size = path.stat().st_size
-        if file_size > self.max_file_size:
-            return {'error': f'File too large: {file_size} bytes (max: {self.max_file_size})'}
-
-        try:
-            # Detect if file is text or binary
-            is_text = self._is_text_file(path)
-
-            result = {
-                'path': str(path),
-                'size': file_size,
-                'is_text': is_text,
-                'encoding': encoding,
-                'modified': datetime.fromtimestamp(path.stat().st_mtime).isoformat(),
-                'permissions': oct(path.stat().st_mode)[-3:],
-                'lines': 0,
-                'content': '',
-                'hash': self._calculate_hash(path),
-                'mime_type': mimetypes.guess_type(str(path))[0]
-            }
-
-            if is_text:
-                with open(path, 'r', encoding=encoding) as f:
-                    if max_lines:
-                        lines = []
-                        for i, line in enumerate(f):
-                            if i >= max_lines:
-                                break
-                            lines.append(line.rstrip('\n\r'))
-                        result['content'] = '\n'.join(lines)
+# The rest of the original file has been moved to the files/ directory.
+# This is maintained for backward compatibility only.
                         result['lines'] = len(lines)
                         result['truncated'] = i >= max_lines - 1
                     else:

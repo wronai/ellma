@@ -52,8 +52,9 @@ class ELLMaCompleter(Completer):
         # Add shell built-in commands
         shell_commands = [
             'help', 'status', 'evolve', 'reload', 'history',
-            'clear', 'exit', 'quit', 'modules', 'config',
-            'generate', 'analyze', 'monitor'
+            'clear', 'exit', 'quit', 'bye', 'modules', 'config',
+            'generate', 'analyze', 'monitor',
+            '/exit', '/quit', '/bye'  # Add slash-prefixed commands
         ]
         self.commands.extend(shell_commands)
 
@@ -111,6 +112,10 @@ class InteractiveShell:
             'clear': self._cmd_clear,
             'exit': self._cmd_exit,
             'quit': self._cmd_exit,
+            'bye': self._cmd_exit,  # Add /bye as an exit command
+            '/exit': self._cmd_exit,  # Also support /exit
+            '/quit': self._cmd_exit,  # Also support /quit
+            '/bye': self._cmd_exit,   # Support /bye as well
             'modules': self._cmd_modules,
             'config': self._cmd_config,
             'generate': self._cmd_generate,
@@ -286,7 +291,7 @@ class InteractiveShell:
 - **reload** - Reload modules
 - **history** - Show command history
 - **clear** - Clear screen
-- **exit/quit** - Exit shell
+- **exit/quit/bye** - Exit shell (also works with /exit, /quit, /bye)
 - **modules** - List available modules
 - **config** - Show configuration
 - **generate** <type> <task> - Generate code

@@ -187,19 +187,28 @@ class WebCommands(BaseCommand):
                 'timestamp': datetime.now().isoformat()
             }
 
-    @validate_args(str)
+    @validate_args(str, bool, bool)
     @log_execution
     def read(self, url: str, extract_text: bool = True, extract_links: bool = False) -> Dict[str, Any]:
         """
         Read and extract content from a web page
 
         Args:
-            url: Target URL
-            extract_text: Extract clean text content
-            extract_links: Extract all links
+            url (str): Target URL to read from
+            extract_text (bool, optional): Whether to extract clean text content. Defaults to True.
+            extract_links (bool, optional): Whether to extract all links. Defaults to False.
 
         Returns:
-            Extracted content and metadata
+            Dict[str, Any]: Dictionary containing extracted content and metadata with the following structure:
+                - url (str): The requested URL
+                - title (str): Page title if available
+                - text (str): Extracted text content (if extract_text=True)
+                - links (list): List of extracted links (if extract_links=True)
+                - images (list): List of image URLs found on the page
+                - metadata (dict): Page metadata (title, description, etc.)
+                - word_count (int): Number of words in extracted text
+                - language (str): Detected language of the page
+                - timestamp (str): ISO format timestamp of when the page was read
         """
         # Get the page
         response_data = self.get(url)
