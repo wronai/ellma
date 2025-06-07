@@ -30,7 +30,7 @@ pytestmark = pytest.mark.skipif(
 # Skip network tests by default to avoid external dependencies
 SKIP_NETWORK_TESTS = os.environ.get('SKIP_NETWORK_TESTS', '1') == '1'
 
-# Only define these if we have the dependencies
+# Only run the test if we have the required dependencies
 if HAS_DEPENDENCIES:
     # Define test constants
     TEST_SEVERITY_LEVELS = [
@@ -39,6 +39,9 @@ if HAS_DEPENDENCIES:
         (SecurityCheckSeverity.HIGH, "ERROR"),
         (SecurityCheckSeverity.CRITICAL, "ERROR"),
     ]
+else:
+    # Define empty test constants if dependencies are missing
+    TEST_SEVERITY_LEVELS = []
 
 def test_check_file_permissions_secure(tmp_path):
     """Test checking secure file permissions."""
@@ -285,12 +288,8 @@ def test_validate_environment_insecure(tmp_path):
     assert len(findings) >= 2  # At least two findings (one for each file)
     assert any(f.severity == SecurityCheckSeverity.HIGH for f in findings)
 
-@pytest.mark.parametrize("severity,expected_log_level", [
-    (SecurityCheckSeverity.LOW, "INFO"),
-    (SecurityCheckSeverity.MEDIUM, "WARNING"),
-    (SecurityCheckSeverity.HIGH, "ERROR"),
-    (SecurityCheckSeverity.CRITICAL, "ERROR"),
-])
+@pytest.mark.skipif(not HAS_DEPENDENCIES, reason="Missing required dependencies")
+@pytest.mark.parametrize("severity,expected_log_level", TEST_SEVERITY_LEVELS)
 def test_severity_logging(severity, expected_log_level, caplog):
     """Test that findings are logged with appropriate log levels."""
     validator = SecurityValidator()
