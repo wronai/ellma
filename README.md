@@ -17,6 +17,8 @@ ELLMa is a revolutionary **self-evolving AI agent** that runs locally on your ma
 - 🐚 **Shell-Native**: Integrates seamlessly with your system and workflows  
 - 🛠️ **Command Execution**: Executes commands in a structured format
 - 📦 **Modular**: Extensible architecture that grows with your needs
+- 🤖 **Multi-Model**: Supports various local LLM models
+- 🔄 **Auto-Improving**: Continuously learns from interactions
 
 ## ⚡ Quick Start
 
@@ -24,19 +26,17 @@ ELLMa is a revolutionary **self-evolving AI agent** that runs locally on your ma
 - Python 3.8+
 - pip
 - Git (for development)
+- 8GB+ RAM recommended for local models
 
 ### Installation
 
-#### Option 1: Install from source
+#### Option 1: Install from source (recommended for development)
 ```bash
 # Clone the repository
 git clone https://github.com/wronai/ellma.git
 cd ellma
 
-# Install in development mode
-pip install -e .
-
-# Or install with all dependencies
+# Install in development mode with all dependencies
 pip install -e ".[dev]"
 ```
 
@@ -49,52 +49,127 @@ pip install ellma
 
 1. **Initialize ELLMa** (creates config in ~/.ellma)
    ```bash
+   # Basic initialization
    ellma init
+   
+   # Force re-initialization
+   # ellma init --force
    ```
 
-2. **Download the model** (or let it auto-download when needed)
+2. **Download a model** (or let it auto-download when needed)
    ```bash
-   ellma setup --download-model
+   # Download default model
+   ellma download-model
+   
+   # Specify a different model
+   # ellma download-model --model mistral-7b-instruct
    ```
 
-3. **Start the interactive shell**
+3. **Verify your setup**
    ```bash
+   # Check system requirements and configuration
+   ellma verify
+   ```
+
+4. **Start the interactive shell**
+   ```bash
+   # Start interactive shell
    ellma shell
+   
+   # Start shell with verbose output
+   # ellma -v shell
    ```
 
-4. **Or execute commands directly**
+5. **Or execute commands directly**
    ```bash
-   # Basic system commands
+   # System information
    ellma exec system.scan
    
    # Web interaction
-   ellma exec web.read 'https://example.com'
+   ellma exec web.read 'https://example.com' --summarize
+   
+   # File operations
+   ellma exec files.search /path/to/directory --pattern "*.py"
+   
+   # Get agent status
+   ellma status
    ```
+
+## 🛠 Development
 
 ### Development Installation
 
-For development, you'll need additional dependencies:
-
 ```bash
-# Install with development dependencies
+# Install development dependencies
 pip install -e ".[dev]"
 
+# Install pre-commit hooks
+pre-commit install
+```
+
+### Common Tasks
+
+```bash
 # Run tests
 make test
 
 # Run linters
 make lint
+
+# Format code
+make format
+
+# Run type checking
+make typecheck
+
+# Run security checks
+make security
 ```
 
-### Your First Evolution
+### Project Structure
+
+```
+ellma/
+├── ellma/                  # Main package
+│   ├── core/              # Core functionality
+│   ├── commands/          # Built-in commands
+│   ├── generators/        # Code generation
+│   ├── models/           # Model management
+│   └── utils/            # Utilities
+├── tests/                 # Test suite
+├── docs/                 # Documentation
+└── scripts/              # Development scripts
+```
+
+## 🔄 Evolution & Self-Improvement
+
+ELLMa can analyze its performance and evolve its capabilities:
+
 ```bash
-# Let ELLMa analyze itself and improve
+# Run a single evolution cycle
 ellma evolve
+
+# Run multiple evolution cycles
+ellma evolve --cycles 3
+
+# Force evolution even if no improvements are detected
+ellma evolve --force
+```
+
+### Monitoring Evolution
+
+```bash
+# View evolution history
+cat ~/.ellma/evolution/evolution_history.json
+
+# Monitor evolution logs
+tail -f ~/.ellma/logs/evolution.log
 ```
 
 ## 🎯 Core Features
 
 ### 🧬 Self-Evolution Engine
+
 ELLMa continuously improves by analyzing its performance and automatically generating new modules:
 
 ```bash
@@ -106,6 +181,31 @@ $ ellma evolve
    ✅ Added: network_monitoring
    ✅ Added: code_optimizer
 🎉 Evolution complete! 3 new capabilities added.
+```
+
+### 📊 Performance Monitoring
+
+Track your agent's performance:
+```bash
+# Show agent status
+ellma status
+
+# View performance metrics
+ellma exec system.metrics
+```
+
+### 🔍 Advanced Command Usage
+
+```bash
+# Chain multiple commands
+ellma exec "system.scan && web.read https://example.com --summarize"
+
+# Save command output to file
+ellma exec system.scan --output scan_results.json
+
+# Use different output formats
+ellma exec system.info --format json
+ellma exec system.info --format yaml
 ```
 
 ### 🐚 Powerful Shell Interface
@@ -171,34 +271,73 @@ ellma/
 
 ### System Administration
 ```bash
-# Monitor system health
-ellma exec "system.health"
+# Get system overview
+ellma exec system.overview
 
-# Generate monitoring script
-ellma generate bash --task="Check disk space and send alerts"
+# Monitor system resources
+ellma exec system.monitor --cpu --memory --disk
 
-# Analyze log files
-ellma exec "files.analyze /var/log/syslog --pattern=error"
+# Find large files
+ellma exec files.find_large --path /var --min-size 100M
+
+# Check network connections
+ellma exec system.network_connections
 ```
 
-### Development Tasks
+### Development Workflow
+
 ```bash
-# Generate project structure
-ellma generate python --task="FastAPI project with authentication"
+# Generate a new Python project
+ellma generate python --task "FastAPI project with SQLAlchemy and JWT auth"
 
-# Create deployment configuration
-ellma generate docker --task="Production ready web app with nginx"
+# Create a Docker Compose setup
+ellma generate docker --task "Python app with PostgreSQL and Redis"
 
-# Generate test scripts
-ellma generate bash --task="Integration testing for REST API"
+# Generate test cases
+ellma generate test --file app/main.py --framework pytest
+
+# Document a Python function
+ellma exec "code.document_function --file utils.py --function process_data"
 ```
 
-### Web Automation
-```bash
-# Read and summarize web content
-ellma exec "web.read https://news.ycombinator.com --summarize"
+### Web & API Interaction
 
-# Generate web scraping code
+```bash
+# Read and summarize a webpage
+ellma exec "web.read https://example.com --summarize --extract-links"
+
+# Test API endpoints
+ellma exec "web.test_endpoint --url https://api.example.com/data --method GET"
+
+# Generate API client code
+ellma generate python --task "API client for REST service with error handling"
+```
+
+### Data Processing
+
+```bash
+# Analyze CSV data
+ellma exec "data.analyze --file data.csv --format csv"
+
+# Convert between data formats
+ellma exec "data.convert --input data.json --output data.yaml"
+
+# Generate data visualization
+ellma generate python --task "Plot time series data from CSV"
+```
+
+### Custom Commands
+
+```bash
+# List available commands
+ellma exec system.commands
+
+# Get help for a specific command
+ellma exec "help system.scan"
+
+# Create a custom command
+ellma exec "command.create --name hello --code 'echo \"Hello, World!\"'"
+```
 ellma generate python --task="Scrape product prices with retry logic"
 ```
 

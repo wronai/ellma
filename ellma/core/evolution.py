@@ -534,7 +534,7 @@ def enhanced_{command_name}(self, *args, **kwargs):
             'priority': opportunity['priority']
         }
 
-    def _generate_generic_solution(self, opportunity: Dict) -> Dict:
+    def _generate_generic_solution(self, opportunity: Dict) -> Optional[Dict]:
         """Generate generic solution"""
         prompt = f"""
         Create a Python solution for this improvement opportunity:
@@ -558,9 +558,133 @@ def enhanced_{command_name}(self, *args, **kwargs):
             }
         except Exception as e:
             logger.error(f"Failed to generate generic solution: {e}")
+            return None
 
-        return None
+    def _test_solutions(self, solutions: List[Dict]) -> List[Dict]:
+        """
+        Test and validate generated solutions
         
+        Args:
+            solutions: List of solution dictionaries to test
+            
+        Returns:
+            List of validated solutions
+        """
+        self.console.print(f"[yellow]Testing {len(solutions)} solutions...[/yellow]")
+        validated_solutions = []
+        
+        for solution in solutions:
+            try:
+                # Simple validation - check required fields
+                if all(k in solution for k in ['type', 'description', 'code']):
+                    solution['test_status'] = 'validated'
+                    solution['test_timestamp'] = datetime.now().isoformat()
+                    validated_solutions.append(solution)
+                else:
+                    solution['test_status'] = 'invalid'
+                    solution['error'] = 'Missing required fields'
+            except Exception as e:
+                solution['test_status'] = 'error'
+                solution['error'] = str(e)
+                logger.error(f"Error testing solution: {e}")
+        
+        return validated_solutions
+
+    def _integrate_solutions(self, solutions: List[Dict]) -> Dict:
+        """
+        Integrate validated solutions into the agent
+        
+        Args:
+            solutions: List of validated solutions
+            
+        Returns:
+            Integration results
+        """
+        self.console.print(f"[yellow]Integrating {len(solutions)} solutions...[/yellow]")
+        results = {
+            'total': len(solutions),
+            'successful': 0,
+            'failed': 0,
+            'integrated': []
+        }
+        
+        for solution in solutions:
+            try:
+                if solution.get('test_status') == 'validated':
+                    module_name = f"generated_{len(os.listdir(self.generated_modules_dir)) + 1}"
+                    module_path = self.generated_modules_dir / f"{module_name}.py"
+                    
+                    with open(module_path, 'w') as f:
+                        f.write(solution.get('code', ''))
+                    
+                    solution['module_path'] = str(module_path)
+                    results['successful'] += 1
+                    results['integrated'].append({
+                        'module': module_name,
+                        'path': str(module_path),
+                        'timestamp': datetime.now().isoformat()
+                    })
+                else:
+                    results['failed'] += 1
+            except Exception as e:
+                logger.error(f"Error integrating solution: {e}")
+                results['failed'] += 1
+        
+        return results
+
+    def _update_learning(self, integration_results: Dict) -> Dict:
+        """
+        Update the agent's learning based on integration results
+        
+        Args:
+            integration_results: Results from solution integration
+            
+        Returns:
+            Learning update results
+        """
+        self.console.print("[yellow]Updating agent's knowledge...[/yellow]")
+        
+        # Simple learning update - just log the results
+        learning_update = {
+            'timestamp': datetime.now().isoformat(),
+            'integrated_modules': integration_results.get('successful', 0),
+            'learning_rate': self.learning_rate
+        }
+        
+        # Update agent's learning rate based on success
+        if integration_results.get('successful', 0) > 0:
+            self.learning_rate = min(1.0, self.learning_rate * 1.1)  # Increase learning rate
+        
+        return learning_update
+
+    def _display_evolution_results(self, results: Dict) -> None:
+        """
+        Display evolution results in a user-friendly format
+        
+        Args:
+            results: Evolution results dictionary
+        """
+        table = Table(title="Evolution Results", show_header=True, header_style="bold magenta")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
+        
+        # Add basic metrics
+        table.add_row("Evolution ID", results.get('evolution_id', 'N/A'))
+        table.add_row("Status", results.get('status', 'unknown').upper())
+        table.add_row("Duration", f"{results.get('duration', 0):.2f} seconds")
+        
+        # Add solution metrics
+        if 'solutions_generated' in results:
+            table.add_row("Solutions Generated", str(results['solutions_generated']))
+            table.add_row("Solutions Validated", str(results.get('solutions_validated', 0)))
+        
+        # Add integration results
+        if 'integrations' in results:
+            table.add_row("Modules Integrated", str(results['integrations'].get('successful', 0)))
+            table.add_row("Integration Failures", str(results['integrations'].get('failed', 0)))
+        
+        self.console.print(table)
+
     def _log_evolution(self, results: Dict) -> None:
         """
         Log the results of an evolution cycle
@@ -568,13 +692,11 @@ def enhanced_{command_name}(self, *args, **kwargs):
         Args:
             results: Dictionary containing evolution results
         """
+        self.evolution_log.append(results)
+        
+        # Save to file
+        history_file = self.evolution_dir / "evolution_history.json"
         try:
-            # Add to in-memory log
-            self.evolution_log.append(results)
-            
-            # Save to file
-            history_file = self.evolution_dir / "evolution_history.json"
-            
             # Ensure directory exists
             history_file.parent.mkdir(parents=True, exist_ok=True)
             
