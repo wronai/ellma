@@ -180,25 +180,45 @@ include = '\.pyi?$'
     
     def _generate_main(self, module_dir: Path, spec: Dict[str, Any], module_name: str) -> None:
         """Generate the main module file."""
-        content = f'''"""
-{spec['name']}
-{"=" * len(spec['name'])}
+        # Create module directory if it doesn't exist
+        module_path = module_dir / module_name
+        module_path.mkdir(parents=True, exist_ok=True)
+        
+        # Generate module content
+        class_name = spec['name'].title().replace(' ', '')
+        content = f'''"""{spec['name']} module."""
 
-{spec.get('description', '')}
-"""
+class {class_name}:
+    """{spec.get('description', 'Module implementation.')}"""
+    
+    def __init__(self):
+        self.name = "{module_name}"
+        self.version = "0.1.0"
+    
+    def example_method(self):
+        """Example method that returns a greeting."""
+        return f"Hello from {{self.name}}!"
 
-# Your module code here
 
 def main():
     """Main entry point for the module."""
-    print(f"Hello from {module_name}!")
+    module = {class_name}()
+    print(module.example_method())
 
 
 if __name__ == "__main__":
     main()
 '''
-        (module_dir / module_name / "__init__.py").write_text(content)
-        (module_dir / module_name / "__init__.py").chmod(0o644)
+        
+        # Write __init__.py
+        init_file = module_path / "__init__.py"
+        init_file.write_text(f'"""{spec["name"]} module."""\n')
+        init_file.chmod(0o644)
+        
+        # Write main.py
+        main_file = module_path / "main.py"
+        main_file.write_text(content)
+        main_file.chmod(0o644)
     
     def _generate_tests(self, module_dir: Path, spec: Dict[str, Any], module_name: str) -> None:
         """Generate test files for the module."""
