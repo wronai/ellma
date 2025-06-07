@@ -499,9 +499,32 @@ ellma generate python --task "FastAPI project with SQLAlchemy and JWT auth"
 ellma generate docker --task "Python app with PostgreSQL and Redis"
 
 # Generate test cases
+```bash
 ellma generate test --file app/main.py --framework pytest
 
 # Document a Python function
+```
+
+### Generated Utilities Examples
+
+Explore practical examples of using the generated utilities in the `examples/generated_utils/` directory:
+
+1. [Error Handling](examples/generated_utils/error_handling_example.py) - Automatic retries with exponential backoff
+2. [Performance Caching](examples/generated_utils/cache_example.py) - Efficient data caching with TTL
+3. [Parallel Processing](examples/generated_utils/parallel_processing_example.py) - Concurrent task execution
+4. [Combined Example](examples/generated_utils/combined_example.py) - Using all utilities together
+
+Run any example with:
+```bash
+# From the project root
+python -m examples.generated_utils.example_name
+
+# Or directly
+cd examples/generated_utils/
+python example_name.py
+```
+
+For more details, see the [generated utilities documentation](docs/generated_utilities.md).
 ellma exec code.document_function utils.py --function process_data
 ```
 
