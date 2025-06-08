@@ -45,10 +45,40 @@ ELLMa is a revolutionary **self-evolving AI agent** that runs locally on your ma
 
 ### 🎙️ Audio Features (Optional)
 
-ELLMa includes optional audio capabilities that can be enabled by installing the audio extras:
+ELLMa includes optional audio capabilities that can be enabled by installing the audio extras. These features require additional system dependencies.
+
+#### Audio Features
 
 - **Speech Recognition**: Convert speech to text
 - **Text-to-Speech**: Convert text to speech (coming soon)
+
+#### Installation
+
+To install with audio support:
+
+```bash
+pip install ellma[audio]
+```
+
+#### System Dependencies
+
+**On Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install -y python3-dev portaudio19-dev
+```
+
+**On Fedora/RHEL:**
+```bash
+sudo dnf install -y python3-devel alsa-lib-devel portaudio-devel
+```
+
+**On macOS (using Homebrew):**
+```bash
+brew install portaudio
+```
+
+**Note:** Audio features are optional. If you don't need them, you can use ELLMa without installing these dependencies.
 - **Audio Processing**: Work with audio files and streams
 
 To install with audio support:

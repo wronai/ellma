@@ -6,13 +6,135 @@ Provides speech recognition functionality using various backends.
 
 import os
 import wave
-import audioop
 import tempfile
 import importlib
-from typing import Optional, Union, BinaryIO, Tuple, Dict, Any
+import warnings
+from typing import Optional, Union, BinaryIO, Tuple, Dict, Any, Type, Any
 from dataclasses import dataclass
 from enum import Enum
 from rich.console import Console
+
+# Try to import audioop with fallback
+try:
+    import audioop
+    AUDIOOP_AVAILABLE = True
+except ImportError:
+    AUDIOOP_AVAILABLE = False
+    warnings.warn(
+        "audioop module not found. Audio processing features will be limited. "
+        "Install the 'audio' extra with: pip install ellma[audio]"
+    )
+    
+    # Create a dummy audioop module
+    class DummyAudioop:
+        @staticmethod
+        def add(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def adpcm2lin(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def alaw2lin(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def avg(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def avgpp(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def bias(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def cross(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def findfactor(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def findfit(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def findmax(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def getsample(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def lin2adpcm(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def lin2alaw(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def lin2lin(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def lin2ulaw(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def max(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def maxpp(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def minmax(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def mul(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def ratecv(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def reverse(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def rms(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def tomono(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def tostereo(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def ulaw2lin(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+        
+        @staticmethod
+        def get_sample_size(*args, **kwargs):
+            raise ImportError("audioop module not available. Install the 'audio' extra with: pip install ellma[audio]")
+    
+    # Replace the audioop module with our dummy implementation
+    import sys
+    sys.modules['audioop'] = DummyAudioop()
+    audioop = DummyAudioop()
 
 # Define dummy classes first for fallback
 class DummyAudioData:
