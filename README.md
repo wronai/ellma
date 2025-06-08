@@ -43,6 +43,39 @@ ELLMa is a revolutionary **self-evolving AI agent** that runs locally on your ma
 - **Security Checks**: Performs security validations before executing commands
 - **Graceful Degradation**: Works even when optional dependencies are missing
 
+### 🎙️ Audio Features (Optional)
+
+ELLMa includes optional audio capabilities that can be enabled by installing the audio extras:
+
+- **Speech Recognition**: Convert speech to text
+- **Text-to-Speech**: Convert text to speech (coming soon)
+- **Audio Processing**: Work with audio files and streams
+
+To install with audio support:
+```bash
+poetry install --extras "audio"
+# or with pip
+pip install ellma[audio]
+```
+
+Note: Audio features require system dependencies. On Fedora/RHEL:
+```bash
+sudo dnf install python3-devel alsa-lib-devel portaudio-devel
+```
+
+On Ubuntu/Debian:
+```bash
+sudo apt-get install python3-dev portaudio19-dev
+```
+
+## 📦 Installation
+
+### Prerequisites
+
+- Python 3.10 or higher
+- Poetry (recommended) or pip
+- System dependencies (for audio features, see above)
+
 ### 🛠 Commands
 
 ```bash

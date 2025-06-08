@@ -44,6 +44,16 @@ download-model: ## Download the default model
 	curl -L $(MODEL_URL) -o $(MODEL_FILE)
 	@echo "${GREEN}✓ Model downloaded to $(MODEL_FILE)${RESET}"
 
+##@ Documentation
+
+docs: ## Generate documentation
+	@echo "${GREEN}Generating documentation...${RESET}"
+	$(POETRY) run mkdocs build
+
+serve-docs: ## Serve documentation locally
+	@echo "${GREEN}Starting documentation server...${RESET}"
+	$(POETRY) run mkdocs serve --no-root
+
 ##@ Installation
 
 install: ## Install the package
@@ -62,7 +72,26 @@ uninstall: ## Uninstall the package
 
 ##@ Testing
 
-test: ## Run all tests
+test: test-core test-optional ## Run all tests (core + optional)
+
+.PHONY: test-core
+test-core: ## Run core tests only (without optional dependencies)
+	@echo "${GREEN}Running core tests (without optional dependencies)...${RESET}"
+	$(POETRY) run pytest tests/ -v -m "not requires_audio and not requires_audioop"
+
+.PHONY: test-optional
+test-optional: ## Run tests for optional features
+	@echo "${GREEN}Running tests for optional features...${RESET}"
+	$(POETRY) run pytest tests/ -v -m "requires_audio or requires_audioop"
+
+.PHONY: test-coverage
+test-coverage: ## Run tests with coverage report
+	@echo "${GREEN}Running tests with coverage...${RESET}"
+	$(POETRY) run coverage run -m pytest tests/
+	$(POETRY) run coverage report -m
+
+.PHONY: test-all
+test-all: test test-optional test-coverage ## Run all tests including coverage
 	@echo "${GREEN}Running all tests...${RESET}"
 	$(POETRY) run pytest
 
@@ -90,17 +119,17 @@ quick-test: ## Run quick test suite (faster, less verbose)
 
 ##@ Code Quality
 
-lint: ## Run all linters
-	@echo "${GREEN}Running linters...${RESET}"
-	$(POETRY) run black --check ellma/ tests/
-	$(POETRY) run isort --check-only ellma/ tests/
-	$(POETRY) run flake8 ellma/ tests/
-	$(POETRY) run mypy ellma/
+lint: ## Run linters
+	@echo "${GREEN}Running code formatters and linters...${RESET}"
+	$(POETRY) run black --check .
+	$(POETRY) run isort --check-only .
+	$(POETRY) run flake8 .
 
-format: ## Format code with black and isort
+format: ## Format code
 	@echo "${GREEN}Formatting code...${RESET}"
-	$(POETRY) run black ellma/ tests/
-	$(POETRY) run isort ellma/ tests/
+	$(POETRY) run black .
+	$(POETRY) run isort .ellma/ tests/
+	$(POETRY) run mypy ellma/
 
 format-check: ## Check code formatting without making changes
 	@echo "${GREEN}Checking code formatting...${RESET}"
