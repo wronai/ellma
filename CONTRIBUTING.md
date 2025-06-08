@@ -97,6 +97,53 @@ pytest --cov=ellma
 pytest tests/integration/
 ```
 
+### Testing with Optional Dependencies
+
+ELLMa includes optional audio features that require additional dependencies. The test suite is designed to work both with and without these dependencies.
+
+#### Testing Without Audio Dependencies
+
+By default, tests that require audio dependencies will be skipped if the dependencies are not installed:
+
+```bash
+# Run tests without audio dependencies
+pytest tests/
+```
+
+#### Testing With Audio Dependencies
+
+To test with audio features, install the audio extras and set the `TEST_AUDIO` environment variable:
+
+```bash
+# Install with audio dependencies
+pip install -e .[dev,audio]
+
+# Run tests with audio features
+export TEST_AUDIO=1  # On Windows: set TEST_AUDIO=1
+pytest tests/
+```
+
+### Writing Tests
+
+When writing tests that depend on optional features:
+
+1. Use the `@pytest.mark.audio` decorator for tests that require audio features
+2. Check for required dependencies at runtime using `pytest.importorskip`
+3. Provide meaningful skip messages when dependencies are missing
+
+Example:
+
+```python
+import pytest
+
+def test_audio_feature():
+    # Skip if audio dependencies are not available
+    pytest.importorskip("pyaudio")
+    
+    # Test audio functionality
+    ...
+```
+
 ### Writing Tests
 
 - Use pytest for testing framework
